@@ -85,7 +85,7 @@
   .roomcode { display: inline-flex; align-items: center; gap: 8px; }
   .roomcode b { font-family: var(--f-display); font-weight: 500; letter-spacing: 0.18em; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; }
 
-  .layout { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) clamp(260px, 26vw, 340px); grid-template-rows: minmax(0, 1fr); min-height: 0; min-width: 0; background: transparent; isolation: isolate; }
+  .layout { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) var(--chatw, clamp(260px, 26vw, 340px)); grid-template-rows: minmax(0, 1fr); min-height: 0; min-width: 0; background: transparent; isolation: isolate; }
   .layout.nochat { grid-template-columns: minmax(0, 1fr); }
   .layout.nochat .chat { display: none; }
   .stage-col { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; min-height: 0; min-width: 0; }
@@ -165,7 +165,7 @@
   @media (max-width: 860px) {
     body { font-size: 16px; }
     input[type="text"] { font-size: 16px; }
-    .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 64%) minmax(0, 36%); }
+    .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, calc(100% - var(--chath, 36%))) minmax(0, var(--chath, 36%)); }
     .layout.nochat { grid-template-rows: minmax(0, 1fr); }
     .chat { border-left: 0; border-top: 1px solid var(--line); }
     .topbar { flex-wrap: wrap; justify-content: space-between; gap: 4px 10px; padding-bottom: 6px; padding-top: calc(6px + env(safe-area-inset-top, 0px)); min-width: 0; }
@@ -190,13 +190,27 @@
   }
   /* téléphone, paysage */
   @media (max-width: 950px) and (orientation: landscape) and (max-height: 520px) {
-    .layout { grid-template-columns: minmax(0, 1fr) 240px; grid-template-rows: minmax(0, 1fr); }
+    .layout { grid-template-columns: minmax(0, 1fr) var(--chatw-l, 240px); grid-template-rows: minmax(0, 1fr); }
     .layout.nochat { grid-template-columns: minmax(0, 1fr); }
     .chat { border-top: 0; border-left: 1px solid var(--line); }
     .topbar { display: none; }
     #room { grid-template-rows: minmax(0, 1fr); }
   }
   @media (prefers-reduced-motion: reduce) { .dot.wait { animation: none; } }
+
+  /* ---------- clavier du téléphone ----------
+     La salle suit la zone réellement visible (visualViewport) : quand le clavier s'ouvre, elle rétrécit au lieu d'être recouverte.
+     La vidéo reste en haut ; la barre du haut et les boutons disparaissent le temps de la saisie pour laisser la place au chat. */
+  body.in-room #room { position: fixed; left: 0; top: var(--vvt, 0px); width: 100%; height: calc(var(--vvh, 100dvh) - var(--kbpad, 0px)); }
+  .layout.pfs { top: var(--vvt, 0px); bottom: auto; height: calc(var(--vvh, 100dvh) - var(--kbpad, 0px)); }
+  .tmodal { top: var(--vvt, 0px); bottom: auto; height: calc(var(--vvh, 100vh) - var(--kbpad, 0px)); }
+  @media (max-width: 860px) and (orientation: portrait) {
+    body.kb .topbar, body.kb .filebar, body.kb .sizebar { display: none; }
+    body.kb #room { grid-template-rows: minmax(0, 1fr); }
+    body.kb .layout:not(.nochat) { grid-template-rows: minmax(0, 40%) minmax(0, 60%); }
+    body.kb .chat h3 { padding: 4px 16px; }
+    body.kb .send { padding-top: 8px; padding-bottom: 8px; }
+  }
 
   /* ---------- thème : fond (dégradé + image) ---------- */
   .bgl { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: var(--bg-grad); }
@@ -236,6 +250,28 @@
   .tsec label.lbl { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
   @media (min-width: 861px) { .tmodal { align-items: center; } .tsheet { border-radius: 16px; border-bottom: 1px solid var(--line); } }
   @media (max-width: 860px) { .tsheet .btn { min-height: 40px; } }
+
+  /* plein écran simulé tenu en portrait (le système n'a pas pivoté) : toute la salle pivote de 90° pour remplir l'écran.
+     Activé par le script (classe « rot »), pas par une media query, pour ne pas basculer quand le clavier change la hauteur. */
+  .layout.rot {
+    position: fixed !important;
+    top: 0 !important; left: 0 !important; right: auto !important; bottom: auto !important;
+    width: 100vh !important; height: 100vw !important;
+    width: 100dvh !important; height: 100dvw !important;
+    padding: 0 !important;
+    transform-origin: top left;
+    transform: translateX(100vw) rotate(90deg);
+    grid-template-columns: minmax(0, 1fr) var(--chatw-l, 240px);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .layout.rot.nochat { grid-template-columns: minmax(0, 1fr); }
+
+  /* taille de la zone de chat (bouton « Chat : … ») : 0 petit · 1 moyen (défaut) · 2 grand · 3 très grand
+     --chatw : largeur à côté de la vidéo · --chath : hauteur en portrait téléphone · --chatw-l : largeur en paysage téléphone */
+  .layout[data-chat="0"] { --chatw: clamp(200px, 18vw, 240px); --chath: 24%; --chatw-l: 170px; }
+  .layout[data-chat="2"] { --chatw: clamp(340px, 38vw, 520px); --chath: 50%; --chatw-l: 340px; }
+  .layout[data-chat="3"] { --chatw: clamp(420px, 52vw, 760px); --chath: 64%; --chatw-l: 48vw; }
+  .layout.rot .chat { border-top: 0; border-left: 1px solid var(--line); }
 </style>
 </head>
 <body>
@@ -349,6 +385,14 @@
         <label class="sizeopt" for="zoom">Zoom
           <input type="range" id="zoom" min="50" max="200" value="100" step="5">
           <span id="zoom-val">100 %</span>
+        </label>
+        <label class="sizeopt" for="chatsize">Chat
+          <select id="chatsize">
+            <option value="0">Petit</option>
+            <option value="1">Moyen</option>
+            <option value="2">Grand</option>
+            <option value="3">Très grand</option>
+          </select>
         </label>
         <button class="btn small" id="btn-chat" type="button">Masquer le chat</button>
       </div>
@@ -695,14 +739,24 @@
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var video = $('video'), layout = $('layout');
+  var plyrPlayer = null;
   if (window.Plyr) {
-    new Plyr(video, {
+    plyrPlayer = new Plyr(video, {
       controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'captions', 'settings', 'fullscreen'],
       settings: ['captions'],
       fullscreen: { enabled: true, fallback: true, iosNative: false },
       captions: { active: true, update: true },
       keyboard: { focused: true, global: false },
       tooltips: { controls: false, seek: true }
+    });
+    // plein écran du lecteur lui-même (bouton Plyr) : même rotation automatique sur téléphone
+    plyrPlayer.on('enterfullscreen', function () {
+      if (isFs()) return;                                  // c'est la salle entière qui est en plein écran : gérée ailleurs
+      try { if (window.matchMedia('(pointer: coarse)').matches && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function () {}); } catch (e) {}
+    });
+    plyrPlayer.on('exitfullscreen', function () {
+      if (isFs() || orient.want) return;
+      try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
     });
   }
   var PREFIX = 'samaraf-series-';
@@ -2039,10 +2093,50 @@
 
   /* ---------- plein écran (vidéo + chat) ---------- */
   function isFs() { return document.fullscreenElement === layout || document.webkitFullscreenElement === layout || pseudoFs; }
+  // téléphone : en plein écran, l'écran passe en paysage tout seul (Android/Chrome). Sur iPhone, le CSS fait pivoter la salle.
+  // Un seul mécanisme à la fois, pour éviter que la vidéo pivote puis revienne :
+  // 1) on demande le verrouillage en paysage au système ; 2) seulement si l'écran reste en portrait après cela, on fait pivoter la salle avec le CSS (classe « rot »).
+  var fsWas = false, orient = { want: false, settled: false, locked: false, tm: null };
+  function devicePortrait() {
+    try { var ty = screen.orientation && screen.orientation.type; if (ty) return ty.indexOf('portrait') === 0; } catch (e) {}
+    return window.innerHeight > window.innerWidth;
+  }
+  function applyRot() {
+    layout.classList.toggle('rot', !!(orient.want && orient.settled && pseudoFs && devicePortrait()));
+  }
+  function setLandscape(on) {
+    clearTimeout(orient.tm);
+    orient.want = on; orient.settled = false;
+    if (!on) {
+      if (orient.locked) { try { screen.orientation.unlock(); } catch (e) {} orient.locked = false; }
+      applyRot(); return;
+    }
+    function settle() {
+      orient.settled = true;
+      // plein écran réel mais l'écran est resté en portrait : on passe en plein écran simulé et on pivote avec le CSS
+      if (orient.want && devicePortrait() && !pseudoFs && isFs()) {
+        pseudoFs = true;
+        try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) {}
+        syncFs();
+      }
+      applyRot();
+    }
+    function finish(ok, delay) { orient.locked = !!ok; orient.tm = setTimeout(settle, delay); }
+    var p = null;
+    try {
+      if (window.matchMedia('(pointer: coarse)').matches && screen.orientation && screen.orientation.lock) p = screen.orientation.lock('landscape');
+    } catch (e) { p = null; }
+    if (p && p.then) p.then(function () { finish(true, 700); }, function () { finish(false, 0); });   // 700 ms : le temps que l'écran pivote vraiment
+    else finish(false, 0);
+  }
+  window.addEventListener('resize', applyRot);
+  window.addEventListener('orientationchange', function () { setTimeout(applyRot, 200); });
   function syncFs() {
     var on = isFs();
+    if (on !== fsWas) { fsWas = on; setLandscape(on); }
     layout.classList.toggle('fs', on);
     layout.classList.toggle('pfs', pseudoFs);
+    applyRot();
     $('btn-full').textContent = on ? 'Quitter le plein écran' : 'Plein écran';
     // le panneau taille/zoom est déplacé dans la scène en plein écran, puis remis à sa place
     var sb = $('sizebar'), stg = $('stage');
@@ -2072,6 +2166,21 @@
     $('btn-chat').textContent = hide ? 'Afficher le chat' : 'Masquer le chat';
     $('fs-chat').textContent = hide ? 'Afficher le chat' : 'Masquer le chat';
   }
+
+  /* ---------- taille de la zone de chat ---------- */
+  var CHAT_SIZES = ['Petit', 'Moyen', 'Grand', 'Très grand'], chatLvl = 1;
+  try { var sv = parseInt(localStorage.getItem('samaraf-chatsize'), 10); if (sv >= 0 && sv < CHAT_SIZES.length) chatLvl = sv; } catch (e) {}
+  function setChatLvl(n) {
+    chatLvl = n;
+    layout.setAttribute('data-chat', String(n));
+    $('chatsize').value = String(n);
+    try { localStorage.setItem('samaraf-chatsize', String(n)); } catch (e) {}
+  }
+  setChatLvl(chatLvl);
+  $('chatsize').addEventListener('change', function (e) {
+    if (layout.classList.contains('nochat')) toggleChat();                 // chat masqué : choisir une taille le réaffiche
+    setChatLvl(parseInt(e.target.value, 10));
+  });
 
   /* ---------- interface ---------- */
   $('btn-create').addEventListener('click', function () {
@@ -2212,6 +2321,62 @@
   });
 
   if (window.__theme) window.__theme.bind(broadcast, openConns, function (t) { addMsg('', t, 'sys'); }, function () { return isHost; });
+
+  /* ---------- clavier du téléphone ----------
+     Deux cas :
+     1) le clavier redimensionne la page (navigateur, ou appli en « adjustResize ») : la salle suit la hauteur visible ;
+     2) le clavier se pose par-dessus sans rien redimensionner (WebView d'une appli) : on le détecte au focus du champ
+        et on réserve en bas une hauteur égale à celle du clavier (mesurée si possible, sinon estimée). */
+  (function () {
+    var vv = window.visualViewport, root = document.documentElement.style;
+    var baseH = window.innerHeight, focused = false, settled = false, vkH = 0, tSettle = null, tBlur = null, sawResize = false;
+    function closeKb() {                                                   // le clavier est fermé : le champ perd le focus et la mise en page revient
+      focused = false; settled = false; sawResize = false; vkH = 0;
+      try { if (isText(document.activeElement)) document.activeElement.blur(); } catch (e) {}
+      fit();
+    }
+    // PC (grand écran + souris) : pas de clavier virtuel, donc aucune hauteur n'est réservée et la salle ne rétrécit pas
+    function isDesk() { try { return window.matchMedia('(min-width: 861px) and (pointer: fine)').matches; } catch (e) { return false; } }
+    function isText(el) { return el && el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'search' || el.type === 'url'); }
+    function fit() {
+      var h = vv ? vv.height : window.innerHeight, t = vv ? vv.offsetTop : 0;
+      var zoomed = !!(vv && vv.scale > 1.05), cur = Math.min(window.innerHeight, h);
+      if (!focused && !zoomed) baseH = Math.max(cur, 1);                  // hauteur sans clavier
+      var resized = baseH - cur > 120, pad = 0;
+      if (isDesk()) { resized = false; sawResize = false; }
+      if (focused && resized) sawResize = true;
+      else if (focused && sawResize && !resized) { closeKb(); return; }     // la page a retrouvé sa taille : clavier fermé (touche retour)
+      if (!isDesk() && focused && settled && !zoomed && !resized) pad = vkH > 0 ? vkH : Math.round(baseH * 0.42);
+      root.setProperty('--vvh', Math.round(h) + 'px');
+      root.setProperty('--vvt', Math.round(t) + 'px');
+      root.setProperty('--kbpad', pad + 'px');
+      var kb = !zoomed && (focused || resized);
+      if (isDesk()) { root.setProperty('--vvh', '100dvh'); root.setProperty('--vvt', '0px'); kb = false; }
+      document.body.classList.toggle('kb', kb);
+      if (kb) { var m = $('msgs'); m.scrollTop = m.scrollHeight; }
+    }
+    document.addEventListener('focusin', function (e) {
+      if (!isText(e.target)) return;
+      clearTimeout(tBlur); clearTimeout(tSettle);
+      focused = true; settled = false; fit();
+      tSettle = setTimeout(function () { settled = true; fit(); }, 600);   // on laisse au clavier le temps de redimensionner la page
+    });
+    document.addEventListener('focusout', function (e) {
+      if (!isText(e.target)) return;
+      clearTimeout(tBlur);
+      tBlur = setTimeout(function () { if (!isText(document.activeElement)) { focused = false; settled = false; fit(); } }, 250);
+    });
+    if (vv) { vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); }
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', function () { setTimeout(function () { if (!focused) baseH = window.innerHeight; fit(); }, 300); });
+    try {                                                                  // hauteur exacte du clavier quand le système la fournit
+      if (navigator.virtualKeyboard) navigator.virtualKeyboard.addEventListener('geometrychange', function () {
+        var prev = vkH; vkH = Math.round(navigator.virtualKeyboard.boundingRect.height || 0);
+        if (prev > 0 && vkH === 0 && focused) closeKb(); else fit();
+      });
+    } catch (e) {}
+    fit();
+  })();
 
   /* ---------- démarrage ---------- */
   try { var saved = localStorage.getItem('cad-name'); if (saved) $('name').value = saved; } catch (e) {}
