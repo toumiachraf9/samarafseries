@@ -131,6 +131,8 @@
   /* plein écran : vidéo + chat restent visibles */
   .layout.fs .fsbar { display: flex; }
   .layout.fs .filebar { display: none; }
+  /* quand toute la salle (vidéo + chat) est en plein écran, le bouton plein écran du lecteur est masqué : on utilise « Quitter » */
+  .layout.fs .plyr [data-plyr="fullscreen"] { display: none; }
   /* en plein écran, la barre taille/zoom devient un panneau flottant sous les boutons du haut */
   .layout.fs .sizebar.fs-panel { display: none; position: absolute; top: 52px; right: 10px; z-index: 6; max-width: calc(100% - 20px); border: 1px solid var(--line); border-radius: 12px; background: rgba(18, 17, 26, 0.92); padding: 10px 12px; }
   .layout.fs .sizebar.fs-panel.open { display: flex; }
@@ -287,7 +289,7 @@
     <div class="bgl in-layout" id="bgfs" aria-hidden="true"><div class="wp"></div><div class="dim"></div></div>
     <div class="stage-col">
       <div class="stage" id="stage">
-        <video id="video" playsinline controls controlsList="nofullscreen"></video>
+        <video id="video" playsinline controls></video>
 
         <div id="yt" hidden></div>
 
@@ -695,9 +697,9 @@
   var video = $('video'), layout = $('layout');
   if (window.Plyr) {
     new Plyr(video, {
-      controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'captions', 'settings'],
+      controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'captions', 'settings', 'fullscreen'],
       settings: ['captions'],
-      fullscreen: { enabled: false },
+      fullscreen: { enabled: true, fallback: true, iosNative: false },
       captions: { active: true, update: true },
       keyboard: { focused: true, global: false },
       tooltips: { controls: false, seek: true }
@@ -715,6 +717,7 @@
     catch (e) { return Math.random().toString(36).slice(2, 10); }
   })();
   var joinedOnce = false, noReconnect = false, lastTry = 0, typers = {}, lastTypingSent = 0;
+  var haveKey = '', history = [], seenMids = {}, msgSeq = 0, lostShown = false, lastResume = 0, lastUnavail = 0;
   var remote = { playing: false, time: 0, at: 0, known: false };   // dernier état connu de la source
 
   /* ---------- utilitaires ---------- */
@@ -839,7 +842,7 @@
       else { dot.className = 'dot wait'; txt.textContent = "En attente d'un ami…"; }
     } else {
       if (n > 0) { dot.className = 'dot ok'; txt.textContent = 'Connecté'; }
-      else { dot.className = 'dot wait'; txt.textContent = 'Connexion…'; }
+      else { dot.className = 'dot wait'; txt.textContent = joinedOnce ? 'Connexion perdue · reconnexion…' : 'Connexion…'; }
     }
     if (window.__theme) window.__theme.refresh();
   }
@@ -880,6 +883,18 @@
     conns.forEach(function (c) { if (c !== except && c.open) c.send(msg); });
   }
   // retire une connexion (départ, coupure ou remplacement par une reconnexion)
+  // met la vidéo en pause sans que ce soit pris pour une action de l'utilisateur ; renvoie true si quelque chose jouait
+  function pauseAll() {
+    var did = false;
+    if (yt.active) {
+      if (yt.ready && ytPlaying()) { ytWant = false; ytApplyUntil = Date.now() + 2000; try { yt.player.pauseVideo(); } catch (e) {} did = true; }
+    } else if (hasVideo && !video.paused) {
+      applyingUntil = Date.now() + 2000;
+      remote = { playing: false, time: video.currentTime, at: performance.now(), known: true };
+      video.pause(); did = true;
+    }
+    return did;
+  }
   function dropConn(c, quiet) {
     if (c.dead) return;
     c.dead = true;
@@ -888,26 +903,58 @@
     try { c.close(); } catch (e) {}
     delete typers[c.cid]; renderTyping();
     updateStatus();
-    if (!quiet) addMsg('', (c.peerName || 'Un ami') + ' a quitté la salle.', 'sys');
+    // connexion jamais ouverte, remplacée par une reconnexion de la même personne, ou onglet remplacé : pas un vrai départ
+    if (quiet || c.replaced || !c.wasOpen || noReconnect) return;
+    var did = pauseAll();
+    if (isHost) {
+      var txt = (c.peerName || 'Un ami') + ' a quitté la salle.' + (did ? ' La vidéo est en pause.' : '');
+      addMsg('', txt, 'sys');
+      if (openConns().length) {
+        broadcast({ t: 'sys', text: txt });
+        if (did) { if (yt.active) broadcast({ t: 'ytstate', id: yt.id, playing: false, time: ytCur() }); else broadcast(stateMsg()); }
+      }
+    } else {
+      lostShown = true;
+      addMsg('', 'Connexion au salon perdue.' + (did ? ' La vidéo est en pause.' : '') + ' Reconnexion en cours…', 'sys');
+      lastTry = 0; guestLink();
+    }
   }
   function setupConn(c) {
     c.on('open', function () {
+      // un lien valide existe déjà : cette connexion en double est abandonnée
+      if (!isHost && openConns().some(function (o) { return o !== c && !o.dead; })) { c.replaced = true; dropConn(c, true); return; }
+      c.wasOpen = true;
       c.lastSeen = Date.now();
       if (conns.indexOf(c) < 0) conns.push(c);
-      if (!isHost) joinedOnce = true;
-      updateStatus();
-      c.send({ t: 'hello', name: myName, cid: myCid });
-      if (localFile) {
-        c.send({ t: 'source', name: localFile.name });
-        if (subsText) c.send({ t: 'subs', text: subsText });
-        sendFileTo(c.peer);
+      if (!isHost) {
+        joinedOnce = true;
+        if (lostShown) { lostShown = false; addMsg('', 'Reconnecté au salon.', 'sys'); }
       }
-      if (yt.active) c.send({ t: 'yt', id: yt.id, time: ytCur(), playing: ytPlaying(), name: myName });
-      var thm = window.__theme && window.__theme.snapshot(); if (thm) c.send(thm);
+      updateStatus();
+      c.send({ t: 'hello', name: myName, cid: myCid, has: haveKey });
     });
     c.on('data', function (d) { c.lastSeen = Date.now(); handle(d, c); });
     c.on('close', function () { dropConn(c); });
     c.on('error', updateStatus);
+  }
+  function fileKey(f) { return f.name + '|' + f.size; }
+  function pushHistory(mid, name, text, cid) {
+    history.push({ mid: mid, name: String(name || '').slice(0, 20), text: String(text).slice(0, 500), cid: cid });
+    if (history.length > 200) history.shift();
+  }
+  // envoyé à l'autre dès que son 'hello' est reçu (on connaît alors son identifiant et ce qu'il possède déjà)
+  function welcome(c, d) {
+    if (localFile) {
+      if (d.has && d.has === fileKey(localFile)) sendHeartbeat();          // il a déjà toute la vidéo : on ne la renvoie pas
+      else {
+        c.send({ t: 'source', name: localFile.name });
+        if (subsText) c.send({ t: 'subs', text: subsText });
+        sendFileTo(c.peer);
+      }
+    }
+    if (yt.active) c.send({ t: 'yt', id: yt.id, time: ytCur(), playing: ytPlaying(), name: myName });
+    var thm = window.__theme && window.__theme.snapshot(); if (thm) c.send(thm);
+    if (isHost && history.length) c.send({ t: 'history', msgs: history.slice(-200) });
   }
   function handle(d, c) {
     if (!d || !d.t) return;
@@ -917,21 +964,44 @@
         c.peerName = d.name; c.cid = d.cid;
         // même personne qui revient (actualisation, reconnexion) : l'ancienne connexion est retirée, elle n'est pas comptée en double
         if (isHost && d.cid) conns.slice().forEach(function (o) {
-          if (o !== c && o.cid === d.cid) { try { o.send({ t: 'replaced' }); } catch (e) {} dropConn(o, true); }
+          if (o !== c && o.cid === d.cid) { o.replaced = true; try { o.send({ t: 'replaced' }); } catch (e) {} dropConn(o, true); }
         });
         updateStatus();
+        welcome(c, d);
         break;
-      case 'ping': break;
+      case 'ping': try { c.send({ t: 'pong' }); } catch (e) {} break;
+      case 'pong': break;
       case 'bye': dropConn(c); break;
-      case 'replaced': noReconnect = true; addMsg('', 'Tu es connecté depuis un autre onglet : celui-ci est déconnecté.', 'sys'); break;
+      case 'replaced':
+        c.replaced = true;
+        // si une autre connexion valide existe encore dans cet onglet, ce n'était qu'un doublon
+        if (openConns().some(function (o) { return o !== c && !o.dead; })) { dropConn(c, true); break; }
+        noReconnect = true; addMsg('', 'Tu es connecté depuis un autre onglet : celui-ci est déconnecté.', 'sys'); break;
       case 'typing':
         if (d.off) delete typers[d.cid]; else typers[d.cid] = { name: d.name, at: Date.now() };
         renderTyping();
         break;
       case 'sys': addMsg('', d.text, 'sys'); break;
-      case 'chat': delete typers[d.cid]; renderTyping(); addMsg(d.name, d.text, ''); showToast(d.name, d.text); break;
+      case 'chat':
+        delete typers[d.cid]; renderTyping();
+        if (typeof d.text !== 'string') break;
+        if (d.mid) { if (seenMids[d.mid]) break; seenMids[d.mid] = 1; }
+        if (isHost) pushHistory(d.mid, d.name, d.text, d.cid);
+        addMsg(String(d.name || '').slice(0, 20), d.text.slice(0, 500), ''); showToast(String(d.name || '').slice(0, 20), d.text.slice(0, 500)); break;
+      case 'history':
+        if (isHost || !Array.isArray(d.msgs)) break;
+        var firstTime = !Object.keys(seenMids).length, shown = 0;
+        d.msgs.slice(-200).forEach(function (m) {
+          if (!m || typeof m.text !== 'string' || (m.mid && seenMids[m.mid])) return;
+          if (m.mid) seenMids[m.mid] = 1;
+          if (!shown) addMsg('', firstTime ? 'Messages du salon :' : 'Messages reçus pendant ton absence :', 'sys');
+          shown++;
+          addMsg(String(m.name || '').slice(0, 20), m.text.slice(0, 500), (m.cid && m.cid === myCid) ? 'me' : '');
+        });
+        break;
       case 'source':
         // un ami choisit une vidéo : la mienne (si j'en ai une) est remplacée par la sienne
+        haveKey = '';
         stopYT(true);
         if (localFile) { localFile = null; fileToken++; }
         resetVideo();
@@ -963,14 +1033,43 @@
   }
 
   // Présence : chacun envoie un signe de vie toutes les 3 s. Sans nouvelles pendant 20 s, la connexion est considérée coupée.
+  // invité : rétablit le lien avec l'hôte (nouveau lien de signalisation, ou nouvelle connexion directe)
+  function guestLink() {
+    if (isHost || noReconnect || !joinedOnce || !roomCode || openConns().length) return;
+    var now = Date.now();
+    if (now - lastTry < 6000) return;
+    lastTry = now;
+    if (!peer || peer.destroyed) {
+      startPeer(null, function () { setupConn(peer.connect(peerId(roomCode), { reliable: true })); });
+    } else if (peer.disconnected) {
+      try { peer.reconnect(); } catch (e) {}                       // l'événement 'open' relance la connexion
+    } else {
+      try { setupConn(peer.connect(peerId(roomCode), { reliable: true })); } catch (e) {}
+    }
+  }
+  // retour au premier plan (appel téléphonique, changement d'application, réseau revenu) : on vérifie tout de suite que le lien est vivant
+  function onResume() {
+    if (!peer || document.hidden) return;
+    var t = Date.now();
+    if (t - lastResume < 1500) return;
+    lastResume = t; lastTry = 0;
+    if (peer.disconnected && !peer.destroyed) { try { peer.reconnect(); } catch (e) {} }
+    openConns().forEach(function (c) { try { c.send({ t: 'ping' }); } catch (e) { dropConn(c); } });
+    setTimeout(function () {
+      conns.slice().forEach(function (c) { if ((c.lastSeen || 0) < t) dropConn(c); });   // aucune réponse : lien mort
+      lastTry = 0; guestLink();
+    }, 4000);
+    guestLink();
+  }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') onResume(); });
+  window.addEventListener('pageshow', onResume);
+  window.addEventListener('online', onResume);
   setInterval(function () {
     var now = Date.now();
     openConns().forEach(function (c) { try { c.send({ t: 'ping' }); } catch (e) {} });
-    conns.slice().forEach(function (c) { if (now - (c.lastSeen || now) > 20000) dropConn(c, !isHost); });
-    if (!isHost && joinedOnce && !noReconnect && peer && !peer.destroyed && !openConns().length && now - lastTry > 8000) {
-      lastTry = now;
-      try { setupConn(peer.connect(peerId(roomCode), { reliable: true })); } catch (e) {}
-    }
+    conns.slice().forEach(function (c) { if (now - (c.lastSeen || now) > 20000) dropConn(c); });
+    if (peer && peer.disconnected && !peer.destroyed) { try { peer.reconnect(); } catch (e) {} }
+    guestLink();
   }, 3000);
   // fermeture de l'onglet : on prévient les autres tout de suite
   function leave(e) {
@@ -985,14 +1084,22 @@
       $('home-error').textContent = 'Impossible de charger la connexion directe. Vérifie ta connexion internet.';
       return;
     }
+    var firstOpen = true;
     peer = id ? new Peer(id) : new Peer();
-    peer.on('open', onOpen);
+    peer.on('open', function (pid) {
+      if (firstOpen) { firstOpen = false; onOpen(pid); }
+      else if (!isHost && !openConns().length) { try { setupConn(peer.connect(peerId(roomCode), { reliable: true })); } catch (e) {} }   // lien de signalisation rétabli
+    });
     peer.on('connection', function (c) {
       if (c.label === 'file') receiveFile(c);
       else if (isHost) setupConn(c);
     });
     peer.on('error', function (e) {
-      if (e.type === 'peer-unavailable') backHome("Aucune salle avec ce code. Vérifie le code ou demande à ton ami de recréer la salle.");
+      if (e.type === 'peer-unavailable') {
+        if (joinedOnce) {                                   // déjà entré dans la salle : on réessaie, sans renvoyer à l'accueil
+          if (Date.now() - lastUnavail > 20000) { lastUnavail = Date.now(); addMsg('', "L'hôte est injoignable pour le moment. Nouvelle tentative…", 'sys'); }
+        } else backHome("Aucune salle avec ce code. Vérifie le code ou demande à ton ami de recréer la salle.");
+      }
       else if (e.type === 'unavailable-id' && isHost) { try { peer.destroy(); } catch (x) {} createRoom(); }
       else { $('home-error').textContent = 'Erreur de connexion : ' + e.type; updateStatus(); }
     });
@@ -1333,6 +1440,7 @@
         addMsg('', 'Vidéo reçue. Vous pouvez lancer la lecture.', 'sys');
         broadcast({ t: 'need' });
       }
+      if (meta) haveKey = meta.name + '|' + meta.size;      // mémorisé : une reconnexion ne redemande pas la vidéo
     }
   }
 
@@ -1459,7 +1567,7 @@
     if (!e || !hasVideo) return;
     // lecture pendant la réception impossible pour cette vidéo : on demande l'envoi complet, une seule fois
     if (mse && !localFile) {
-      recvGen++;
+      recvGen++; haveKey = '';
       resetVideo();
       setDrop('Réception de la vidéo', "La lecture en direct ne marche pas avec cette vidéo. Nouvel envoi complet en cours…", false, 0);
       addMsg('', "La lecture pendant le téléchargement ne marche pas avec cette vidéo : passage à l'envoi complet.", 'sys');
@@ -1499,7 +1607,7 @@
   function loadFile(f) {
     if (!f) return;
     stopYT(true);
-    fileToken++; sending = {};
+    fileToken++; sending = {}; haveKey = '';
     localFile = f;
     classicFor = {};
     startVideo(URL.createObjectURL(typedBlob(f)), f.name + ' · ' + fmtSize(f.size));
@@ -1677,6 +1785,7 @@
     if (!/^[\w-]{11}$/.test(String(id))) return;
     // on quitte le mode fichier : envoi arrêté, réception ignorée, mémoire du lecteur libérée
     if (localFile) { localFile = null; fileToken++; sending = {}; }
+    haveKey = '';
     recvGen++; try { if (fileConn) fileConn.close(); } catch (e) {} fileConn = null;
     resetVideo();
     $('tap').hidden = true; $('drop').hidden = true; $('yt').hidden = false;
@@ -2078,8 +2187,17 @@
     e.preventDefault();
     var inp = $('msg'), text = inp.value.trim();
     if (!text) return;
+    // invité sans lien avec l'hôte : le message ne partirait nulle part, on le dit au lieu de faire semblant
+    if (!isHost && !openConns().length) {
+      addMsg('', "Tu n'es pas connecté au salon : message non envoyé. Reconnexion en cours…", 'sys');
+      lastTry = 0; guestLink();
+      return;
+    }
+    var mid = myCid + '-' + (++msgSeq) + '-' + Date.now().toString(36);
+    seenMids[mid] = 1;
+    if (isHost) pushHistory(mid, myName, text, myCid);
     addMsg(myName, text, 'me');
-    broadcast({ t: 'chat', name: myName, text: text, cid: myCid });
+    broadcast({ t: 'chat', name: myName, text: text, cid: myCid, mid: mid });
     lastTypingSent = 0;
     inp.value = '';
     $('picker').hidden = true;
