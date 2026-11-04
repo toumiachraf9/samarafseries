@@ -198,6 +198,23 @@
   }
   @media (prefers-reduced-motion: reduce) { .dot.wait { animation: none; } }
 
+  /* ---------- clavier du téléphone ----------
+     La salle suit la zone réellement visible (visualViewport) : quand le clavier s'ouvre, elle rétrécit au lieu d'être recouverte.
+     La vidéo reste en haut ; la barre du haut et les boutons disparaissent le temps de la saisie pour laisser la place au chat. */
+  #kb-close { display: none; position: absolute; top: 10px; right: 10px; z-index: 8; background: rgba(18, 17, 26, 0.85); padding: 6px 12px; font-size: 13px; }
+  body.kb #kb-close { display: block; }
+  .layout.fs #kb-close { top: 52px; }
+  body.in-room #room { position: fixed; left: 0; top: var(--vvt, 0px); width: 100%; height: calc(var(--vvh, 100dvh) - var(--kbpad, 0px)); }
+  .layout.pfs { top: var(--vvt, 0px); bottom: auto; height: calc(var(--vvh, 100dvh) - var(--kbpad, 0px)); }
+  .tmodal { top: var(--vvt, 0px); bottom: auto; height: calc(var(--vvh, 100vh) - var(--kbpad, 0px)); }
+  @media (max-width: 860px) and (orientation: portrait) {
+    body.kb .topbar, body.kb .filebar, body.kb .sizebar { display: none; }
+    body.kb #room { grid-template-rows: minmax(0, 1fr); }
+    body.kb .layout:not(.nochat) { grid-template-rows: minmax(0, 40%) minmax(0, 60%); }
+    body.kb .chat h3 { padding: 4px 16px; }
+    body.kb .send { padding-top: 8px; padding-bottom: 8px; }
+  }
+
   /* ---------- thème : fond (dégradé + image) ---------- */
   .bgl { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: var(--bg-grad); }
   .bgl.in-layout { position: absolute; z-index: -1; display: none; }
@@ -303,6 +320,7 @@
           </div>
         </div>
 
+        <button class="btn" id="kb-close" type="button">Fermer le clavier</button>
         <div class="toast" id="toast" hidden></div>
         <div class="qpanel" id="qpanel" hidden>
           <div class="qhead">
@@ -2212,6 +2230,59 @@
   });
 
   if (window.__theme) window.__theme.bind(broadcast, openConns, function (t) { addMsg('', t, 'sys'); }, function () { return isHost; });
+
+  /* ---------- clavier du téléphone ----------
+     Deux cas :
+     1) le clavier redimensionne la page (navigateur, ou appli en « adjustResize ») : la salle suit la hauteur visible ;
+     2) le clavier se pose par-dessus sans rien redimensionner (WebView d'une appli) : on le détecte au focus du champ
+        et on réserve en bas une hauteur égale à celle du clavier (mesurée si possible, sinon estimée). */
+  (function () {
+    var vv = window.visualViewport, root = document.documentElement.style;
+    var baseH = window.innerHeight, focused = false, settled = false, vkH = 0, tSettle = null, tBlur = null, sawResize = false;
+    function closeKb() {                                                   // le clavier est fermé : le champ perd le focus et la mise en page revient
+      focused = false; settled = false; sawResize = false; vkH = 0;
+      try { if (isText(document.activeElement)) document.activeElement.blur(); } catch (e) {}
+      fit();
+    }
+    function isText(el) { return el && el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'search' || el.type === 'url'); }
+    function fit() {
+      var h = vv ? vv.height : window.innerHeight, t = vv ? vv.offsetTop : 0;
+      var zoomed = !!(vv && vv.scale > 1.05), cur = Math.min(window.innerHeight, h);
+      if (!focused && !zoomed) baseH = Math.max(cur, 1);                  // hauteur sans clavier
+      var resized = baseH - cur > 120, pad = 0;
+      if (focused && resized) sawResize = true;
+      else if (focused && sawResize && !resized) { closeKb(); return; }     // la page a retrouvé sa taille : clavier fermé (touche retour)
+      if (focused && settled && !zoomed && !resized) pad = vkH > 0 ? vkH : Math.round(baseH * 0.42);
+      root.setProperty('--vvh', Math.round(h) + 'px');
+      root.setProperty('--vvt', Math.round(t) + 'px');
+      root.setProperty('--kbpad', pad + 'px');
+      var kb = !zoomed && (focused || resized);
+      document.body.classList.toggle('kb', kb);
+      if (kb) { var m = $('msgs'); m.scrollTop = m.scrollHeight; }
+    }
+    document.addEventListener('focusin', function (e) {
+      if (!isText(e.target)) return;
+      clearTimeout(tBlur); clearTimeout(tSettle);
+      focused = true; settled = false; fit();
+      tSettle = setTimeout(function () { settled = true; fit(); }, 600);   // on laisse au clavier le temps de redimensionner la page
+    });
+    document.addEventListener('focusout', function (e) {
+      if (!isText(e.target)) return;
+      clearTimeout(tBlur);
+      tBlur = setTimeout(function () { if (!isText(document.activeElement)) { focused = false; settled = false; fit(); } }, 250);
+    });
+    if (vv) { vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); }
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', function () { setTimeout(function () { if (!focused) baseH = window.innerHeight; fit(); }, 300); });
+    try {                                                                  // hauteur exacte du clavier quand le système la fournit
+      if (navigator.virtualKeyboard) navigator.virtualKeyboard.addEventListener('geometrychange', function () {
+        var prev = vkH; vkH = Math.round(navigator.virtualKeyboard.boundingRect.height || 0);
+        if (prev > 0 && vkH === 0 && focused) closeKb(); else fit();
+      });
+    } catch (e) {}
+    $('kb-close').addEventListener('click', closeKb);
+    fit();
+  })();
 
   /* ---------- démarrage ---------- */
   try { var saved = localStorage.getItem('cad-name'); if (saved) $('name').value = saved; } catch (e) {}
