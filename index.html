@@ -85,7 +85,7 @@
   .roomcode { display: inline-flex; align-items: center; gap: 8px; }
   .roomcode b { font-family: var(--f-display); font-weight: 500; letter-spacing: 0.18em; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; }
 
-  .layout { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) clamp(260px, 26vw, 340px); grid-template-rows: minmax(0, 1fr); min-height: 0; min-width: 0; background: transparent; isolation: isolate; }
+  .layout { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) var(--chatw, clamp(260px, 26vw, 340px)); grid-template-rows: minmax(0, 1fr); min-height: 0; min-width: 0; background: transparent; isolation: isolate; }
   .layout.nochat { grid-template-columns: minmax(0, 1fr); }
   .layout.nochat .chat { display: none; }
   .stage-col { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; min-height: 0; min-width: 0; }
@@ -103,8 +103,19 @@
   .toast { position: absolute; left: 16px; top: 16px; max-width: min(70%, 420px); background: rgba(18, 17, 26, 0.88); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 14px; pointer-events: none; z-index: 3; overflow-wrap: anywhere; }
   .toast b { color: var(--peer); }
   .tap { position: absolute; z-index: 4; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, 0.55); }
-  .fsbar { display: none; position: absolute; top: 10px; right: 10px; z-index: 6; gap: 8px; }
+  /* barre du haut en plein écran : petite flèche fixe ; les boutons descendent de derrière elle puis y remontent */
+  .fsbar { display: none; position: absolute; top: 8px; right: 10px; z-index: 6; flex-direction: column; align-items: flex-end; gap: 6px; max-width: calc(100% - 20px); pointer-events: none; }
+  .fsbar > * { pointer-events: auto; }
+  .fstab { position: relative; z-index: 2; width: 34px; height: 20px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: rgba(18, 17, 26, 0.6); color: #fff; opacity: 0.55; cursor: pointer; transition: opacity .25s ease, background .25s ease; -webkit-tap-highlight-color: transparent; }
+  .fstab:hover, .fsbar:not(.hide) .fstab { opacity: 1; background: rgba(18, 17, 26, 0.85); }
+  .fstab svg { width: 14px; height: 14px; transition: transform .3s ease; }
+  .fsbar:not(.hide) .fstab svg { transform: rotate(180deg); }
+  .fsmenu { position: relative; z-index: 1; display: grid; gap: 6px; justify-items: end; max-width: 100%; transform-origin: top right; transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .25s ease, visibility 0s linear 0s; }
+  .fsbar.hide .fsmenu { transform: translateY(-22px) scale(.9); opacity: 0; visibility: hidden; pointer-events: none; transition: transform .3s cubic-bezier(.4, 0, 1, 1), opacity .25s ease, visibility 0s linear .3s; }
+  .fsbtns { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
   .fsbar .btn { background: rgba(18, 17, 26, 0.78); padding: 6px 12px; font-size: 13px; }
+  @media (max-width: 860px) { .fsbar .btn { padding: 5px 10px; font-size: 12px; } }
+  @media (prefers-reduced-motion: reduce) { .fsmenu, .fsbar.hide .fsmenu, .fstab svg { transition-duration: .01s; } }
 
   .filebar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px max(16px, env(safe-area-inset-left, 0px)); background: var(--panel); border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
   .filebar .fname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 140px; color: var(--fg); }
@@ -133,8 +144,20 @@
   .layout.fs .filebar { display: none; }
   /* quand toute la salle (vidéo + chat) est en plein écran, le bouton plein écran du lecteur est masqué : on utilise « Quitter » */
   .layout.fs .plyr [data-plyr="fullscreen"] { display: none; }
+  /* bouton de qualité intégré à la barre du lecteur */
+  .q-menu .q-btn { padding: 4px 6px; }
+  .q-btn .q-cur { font-size: 11px; font-weight: 700; line-height: 1; padding: 3px 5px; border: 1.5px solid currentColor; border-radius: 5px; letter-spacing: .2px; white-space: nowrap; }
+  .q-pop { min-width: 0; width: max-content; max-height: 70vh; overflow-y: auto; }
+  .q-pop .q-list { padding: 2px 0; }
+  .q-pop .plyr__control { padding: 4px 10px; font-size: 12px; min-height: 0; }
+  .q-title { padding: 5px 10px 2px; font-size: 10px; opacity: .65; text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
+  .q-sep { margin-top: 2px; border-top: 1px solid rgba(128,128,128,.3); padding-top: 6px; }
+  .q-peer { display: flex; justify-content: space-between; gap: 14px; padding: 3px 10px; font-size: 12px; white-space: nowrap; }
+  .q-peer .q-pn { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+  .q-peer .q-pq { opacity: .75; font-variant-numeric: tabular-nums; }
+  .q-menu .plyr__control[disabled] { opacity: .4; cursor: not-allowed; }
   /* en plein écran, la barre taille/zoom devient un panneau flottant sous les boutons du haut */
-  .layout.fs .sizebar.fs-panel { display: none; position: absolute; top: 52px; right: 10px; z-index: 6; max-width: calc(100% - 20px); border: 1px solid var(--line); border-radius: 12px; background: rgba(18, 17, 26, 0.92); padding: 10px 12px; }
+  .layout.fs .sizebar.fs-panel { display: none; position: static; max-width: 100%; border: 1px solid var(--line); border-radius: 12px; background: rgba(18, 17, 26, 0.92); padding: 10px 12px; }
   .layout.fs .sizebar.fs-panel.open { display: flex; }
   .sizebar.fs-panel #btn-chat { display: none; }
   .layout.pfs { position: fixed; inset: 0; z-index: 100; height: 100vh; height: 100dvh; padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
@@ -165,7 +188,7 @@
   @media (max-width: 860px) {
     body { font-size: 16px; }
     input[type="text"] { font-size: 16px; }
-    .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 64%) minmax(0, 36%); }
+    .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, calc(100% - var(--chath, 36%))) minmax(0, var(--chath, 36%)); }
     .layout.nochat { grid-template-rows: minmax(0, 1fr); }
     .chat { border-left: 0; border-top: 1px solid var(--line); }
     .topbar { flex-wrap: wrap; justify-content: space-between; gap: 4px 10px; padding-bottom: 6px; padding-top: calc(6px + env(safe-area-inset-top, 0px)); min-width: 0; }
@@ -190,13 +213,29 @@
   }
   /* téléphone, paysage */
   @media (max-width: 950px) and (orientation: landscape) and (max-height: 520px) {
-    .layout { grid-template-columns: minmax(0, 1fr) 240px; grid-template-rows: minmax(0, 1fr); }
+    .layout { grid-template-columns: minmax(0, 1fr) var(--chatw-l, 240px); grid-template-rows: minmax(0, 1fr); }
     .layout.nochat { grid-template-columns: minmax(0, 1fr); }
     .chat { border-top: 0; border-left: 1px solid var(--line); }
     .topbar { display: none; }
     #room { grid-template-rows: minmax(0, 1fr); }
   }
   @media (prefers-reduced-motion: reduce) { .dot.wait { animation: none; } }
+
+  /* ---------- clavier du téléphone ----------
+     La salle suit la zone réellement visible (visualViewport) : quand le clavier s'ouvre, elle rétrécit au lieu d'être recouverte.
+     La vidéo reste en haut ; la barre du haut et les boutons disparaissent le temps de la saisie pour laisser la place au chat. */
+  body.in-room #room { position: fixed; left: 0; top: var(--vvt, 0px); width: 100%; height: calc(var(--vvh, 100dvh) - var(--kbpad, 0px)); }
+  .layout.pfs { top: var(--vvt, 0px); bottom: auto; height: calc(var(--vvh, 100dvh) - var(--kbpad, 0px)); }
+  /* plein écran réel (le navigateur impose la hauteur de l'écran) : on réserve en bas la place du clavier, la vidéo et le chat rétrécissent au-dessus */
+  .layout.fs:not(.pfs) { padding-bottom: max(var(--kbov, 0px), var(--kbpad, 0px)); }
+  .tmodal { top: var(--vvt, 0px); bottom: auto; height: calc(var(--vvh, 100vh) - var(--kbpad, 0px)); }
+  @media (max-width: 860px) and (orientation: portrait) {
+    body.kb .topbar, body.kb .filebar, body.kb .sizebar { display: none; }
+    body.kb #room { grid-template-rows: minmax(0, 1fr); }
+    body.kb .layout:not(.nochat) { grid-template-rows: minmax(0, 40%) minmax(0, 60%); }
+    body.kb .chat h3 { padding: 4px 16px; }
+    body.kb .send { padding-top: 8px; padding-bottom: 8px; }
+  }
 
   /* ---------- thème : fond (dégradé + image) ---------- */
   .bgl { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: var(--bg-grad); }
@@ -236,6 +275,28 @@
   .tsec label.lbl { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
   @media (min-width: 861px) { .tmodal { align-items: center; } .tsheet { border-radius: 16px; border-bottom: 1px solid var(--line); } }
   @media (max-width: 860px) { .tsheet .btn { min-height: 40px; } }
+
+  /* plein écran simulé tenu en portrait (le système n'a pas pivoté) : toute la salle pivote de 90° pour remplir l'écran.
+     Activé par le script (classe « rot »), pas par une media query, pour ne pas basculer quand le clavier change la hauteur. */
+  .layout.rot {
+    position: fixed !important;
+    top: 0 !important; left: 0 !important; right: auto !important; bottom: auto !important;
+    width: 100vh !important; height: 100vw !important;
+    width: 100dvh !important; height: 100dvw !important;
+    padding: 0 !important;
+    transform-origin: top left;
+    transform: translateX(100vw) rotate(90deg);
+    grid-template-columns: minmax(0, 1fr) var(--chatw-l, 240px);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .layout.rot.nochat { grid-template-columns: minmax(0, 1fr); }
+
+  /* taille de la zone de chat (bouton « Chat : … ») : 0 petit · 1 moyen (défaut) · 2 grand · 3 très grand
+     --chatw : largeur à côté de la vidéo · --chath : hauteur en portrait téléphone · --chatw-l : largeur en paysage téléphone */
+  .layout[data-chat="0"] { --chatw: clamp(200px, 18vw, 240px); --chath: 24%; --chatw-l: 170px; }
+  .layout[data-chat="2"] { --chatw: clamp(340px, 38vw, 520px); --chath: 50%; --chatw-l: 340px; }
+  .layout[data-chat="3"] { --chatw: clamp(420px, 52vw, 760px); --chath: 64%; --chatw-l: 48vw; }
+  .layout.rot .chat { border-top: 0; border-left: 1px solid var(--line); }
 </style>
 </head>
 <body>
@@ -317,10 +378,15 @@
           <button class="btn primary" id="btn-tap" type="button">Appuie pour lancer la lecture</button>
         </div>
         <div class="fsbar" id="fsbar">
-          <button class="btn" id="fs-size" type="button">Taille</button>
-          <button class="btn" id="fs-chat" type="button">Masquer le chat</button>
-          <button class="btn" id="fs-queue" type="button" hidden>File d'attente</button>
-          <button class="btn" id="fs-exit" type="button">Quitter</button>
+          <button class="fstab" id="fs-tab" type="button" aria-label="Menu" aria-expanded="true" aria-controls="fsmenu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          <div class="fsmenu" id="fsmenu">
+            <div class="fsbtns">
+              <button class="btn" id="fs-size" type="button">Taille</button>
+              <button class="btn" id="fs-chat" type="button">Masquer le chat</button>
+              <button class="btn" id="fs-queue" type="button" hidden>File d'attente</button>
+              <button class="btn" id="fs-exit" type="button">Quitter</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="filebar">
@@ -349,6 +415,14 @@
         <label class="sizeopt" for="zoom">Zoom
           <input type="range" id="zoom" min="50" max="200" value="100" step="5">
           <span id="zoom-val">100 %</span>
+        </label>
+        <label class="sizeopt" for="chatsize">Chat
+          <select id="chatsize">
+            <option value="0">Petit</option>
+            <option value="1">Moyen</option>
+            <option value="2">Grand</option>
+            <option value="3">Très grand</option>
+          </select>
         </label>
         <button class="btn small" id="btn-chat" type="button">Masquer le chat</button>
       </div>
@@ -695,8 +769,9 @@
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var video = $('video'), layout = $('layout');
+  var plyrPlayer = null;
   if (window.Plyr) {
-    new Plyr(video, {
+    plyrPlayer = new Plyr(video, {
       controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'captions', 'settings', 'fullscreen'],
       settings: ['captions'],
       fullscreen: { enabled: true, fallback: true, iosNative: false },
@@ -704,12 +779,24 @@
       keyboard: { focused: true, global: false },
       tooltips: { controls: false, seek: true }
     });
+    // plein écran du lecteur lui-même (bouton Plyr) : même rotation automatique sur téléphone
+    plyrPlayer.on('enterfullscreen', function () {
+      if (isFs()) return;                                  // c'est la salle entière qui est en plein écran : gérée ailleurs
+      // plein écran du lecteur = vidéo seule (sans chat) ; on ne pivote en paysage que si la vidéo est en paysage
+      if (!videoLandscape()) return;
+      try { if (window.matchMedia('(pointer: coarse)').matches && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function () {}); } catch (e) {}
+    });
+    plyrPlayer.on('exitfullscreen', function () {
+      if (isFs() || orient.want) return;
+      try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
+    });
   }
   var PREFIX = 'samaraf-series-';
   var CH = 65536;                       // taille d'un morceau envoyé
   var peer = null, conns = [], isHost = false, myName = '', roomCode = '', inviteMode = false;
   var localFile = null, fileToken = 0, sending = {}, hasVideo = false, mse = null;
-  var subsText = '', applyingUntil = 0, pendingState = null, toastTimer = null, wakeLock = null;
+  var fileConns = {}, sendKey = {}, qFor = {}, qCache = {}, qJobs = {}, qGen = 0, qChain = Promise.resolve(), qOwnerNote = '';
+  var switchingUntil = 0, subsText = '', applyingUntil = 0, pendingState = null, toastTimer = null, wakeLock = null;
   var lastUserInput = 0, pointerDown = false, pseudoFs = false;
   var recvGen = 0, classicFor = {}, lastErrAt = 0, fileConn = null, lastReq = { t: -99, at: 0 };
   var myCid = (function () {                 // identifiant propre à cet onglet : une reconnexion remplace l'ancienne connexion
@@ -903,6 +990,7 @@
     try { c.close(); } catch (e) {}
     delete typers[c.cid]; renderTyping();
     updateStatus();
+    if (isHost) renderQ();
     // connexion jamais ouverte, remplacée par une reconnexion de la même personne, ou onglet remplacé : pas un vrai départ
     if (quiet || c.replaced || !c.wasOpen || noReconnect) return;
     var did = pauseAll();
@@ -931,7 +1019,7 @@
         if (lostShown) { lostShown = false; addMsg('', 'Reconnecté au salon.', 'sys'); }
       }
       updateStatus();
-      c.send({ t: 'hello', name: myName, cid: myCid, has: haveKey });
+      c.send({ t: 'hello', name: myName, cid: myCid, has: haveKey, q: myQ });
     });
     c.on('data', function (d) { c.lastSeen = Date.now(); handle(d, c); });
     c.on('close', function () { dropConn(c); });
@@ -945,11 +1033,15 @@
   // envoyé à l'autre dès que son 'hello' est reçu (on connaît alors son identifiant et ce qu'il possède déjà)
   function welcome(c, d) {
     if (localFile) {
-      if (d.has && d.has === fileKey(localFile)) sendHeartbeat();          // il a déjà toute la vidéo : on ne la renvoie pas
-      else {
+      if (d.q && QUALS[d.q]) qFor[c.peer] = d.q;                              // qualité choisie par cette personne
+      var wk = qFor[c.peer] || 'orig', qb = wk !== 'orig' ? qCache[wk] : null, qr = !!(qb && qb.tracks);
+      if (d.has && d.has === fileKey(qr ? qb : localFile)) {                   // il a déjà toute la vidéo : on ne la renvoie pas
+        sendHeartbeat();
+        if (wk !== 'orig' && !qr) serveQuality(c.peer, wk);
+      } else {
         c.send({ t: 'source', name: localFile.name });
         if (subsText) c.send({ t: 'subs', text: subsText });
-        sendFileTo(c.peer);
+        sendBest(c.peer);
       }
     }
     if (yt.active) c.send({ t: 'yt', id: yt.id, time: ytCur(), playing: ytPlaying(), name: myName });
@@ -958,10 +1050,11 @@
   }
   function handle(d, c) {
     if (!d || !d.t) return;
-    if (isHost && /^(chat|typing|state|hb|source|subs|need|yt|ytstate|yths|ytstop)$/.test(d.t)) broadcast(d, c);
+    if (isHost && /^(chat|typing|state|hb|source|subs|need|yt|ytstate|yths|ytstop|quality|qstate)$/.test(d.t)) broadcast(d, c);
     switch (d.t) {
       case 'hello':                                  // arrivée silencieuse : rien dans le chat
         c.peerName = d.name; c.cid = d.cid;
+        if (isHost) { c.q = QUALS[d.q] ? d.q : 'orig'; renderQ(); }
         // même personne qui revient (actualisation, reconnexion) : l'ancienne connexion est retirée, elle n'est pas comptée en double
         if (isHost && d.cid) conns.slice().forEach(function (o) {
           if (o !== c && o.cid === d.cid) { o.replaced = true; try { o.send({ t: 'replaced' }); } catch (e) {} dropConn(o, true); }
@@ -1009,6 +1102,9 @@
         setDrop("Ton ami va t'envoyer la vidéo", d.name, false, 0);
         break;
       case 'subs': applySubs(d.text); break;
+      case 'quality': if (isHost && c && c !== peer) { c.q = QUALS[d.q] ? d.q : 'orig'; renderQ(); }
+        if (localFile && d.pid && peer && d.pid !== peer.id) serveQuality(d.pid, QUALS[d.q] ? d.q : 'orig', +d.at || 0); break;
+      case 'qstate': onQState(d); break;
       case 'need': if (localFile && hasVideo) sendHeartbeat(); break;
       case 'classic':
         // le lecteur de l'ami n'a pas réussi la lecture en direct : on lui renvoie le fichier complet
@@ -1113,30 +1209,36 @@
      - Autres formats (ou si le navigateur de l'ami ne sait pas) :
        envoi du fichier brut, lecture à la fin.
      ===================================================== */
-  function sendFileTo(id) {
-    var f = localFile, tok = fileToken;
-    if (!f || sending[id] === tok) return;
-    sending[id] = tok;
+  function sendFileTo(id, src, qkey, force) {
+    var f = src || localFile, tok = fileToken, qk = qkey || 'orig';
+    if (!f || !peer) return;
+    if (force) { delete sending[id]; var old = fileConns[id]; if (old) { try { old.close(); } catch (e) {} } }   // on remplace l'envoi en cours (changement de qualité)
+    if (sending[id] === tok) return;
+    sending[id] = tok; sendKey[id] = qk;
     var c = peer.connect(id, { label: 'file', serialization: 'raw', reliable: true });
-    var st = { fallback: false };
+    fileConns[id] = c;
+    var st = { fallback: false, q: qk };
     c.on('data', function (d) {
       if (typeof d === 'string') { try { var m = JSON.parse(d); if (m.k === 'fallback') st.fallback = true; else if (m.k === 'seek' && st.seek) st.seek(+m.time); } catch (e) {} }
     });
     c.on('open', async function () {
       try {
         var done = false;
-        if (!classicFor[id] && window.MP4Box && (/\.(mp4|m4v|mov)$/i.test(f.name) || f.type === 'video/mp4')) done = await sendStream(c, f, tok, st);
+        if (f.isStream) {
+          try { done = await sendQStream(c, tok, st, f); }
+          catch (e) { if (e && e.message === 'fb') { qFor[id] = 'orig'; sendKey[id] = 'orig'; await sendClassic(c, localFile, tok); done = true; } else throw e; }
+        }
+        else if (!classicFor[id] && window.MP4Box && (/\.(mp4|m4v|mov)$/i.test(f.name) || f.type === 'video/mp4')) done = await sendStream(c, f, tok, st);
         if (!done) await sendClassic(c, f, tok);
         setXfer('');
-        addMsg('', 'Vidéo envoyée. Bon film !', 'sys');
+        if (qk === 'orig') addMsg('', 'Vidéo envoyée. Bon film !', 'sys');
         setTimeout(function () { try { c.close(); } catch (e) {} }, 3000);
       } catch (e) {
-        setXfer('');
         try { c.close(); } catch (x) {}
-        if (sending[id] === tok) delete sending[id];
+        if (fileConns[id] === c) { setXfer(''); if (sending[id] === tok) delete sending[id]; }
       }
     });
-    c.on('close', function () { if (sending[id] === tok) delete sending[id]; });
+    c.on('close', function () { if (fileConns[id] === c && sending[id] === tok) delete sending[id]; });
   }
 
   function checkAlive(c, tok) { if (tok !== fileToken || !c.open) throw new Error('stop'); }
@@ -1240,7 +1342,7 @@
               return { id: t.id, kind: kind, mime: kind + '/mp4; codecs="' + t.codec + '"', timescale: t.timescale };
             })
           };
-          out.push(JSON.stringify({ k: 'init', name: f.name, size: f.size, duration: meta.duration, tracks: meta.tracks }));
+          out.push(JSON.stringify({ k: 'init', name: f.name, size: f.size, duration: meta.duration, tracks: meta.tracks, q: st.q || 'orig', oh: f.oh || (v.video && v.video.height) || 0 }));
         }
         picked.forEach(function (t) {
           mp4.setSegmentOptions(t.id, null, { nbSamples: t === v ? 100 : 200, rapAlignement: true });
@@ -1367,9 +1469,14 @@
     });
     c.on('close', function () {
       if (!done && rmode && gen === recvGen) {
-        addMsg('', 'Le transfert a été interrompu. Demande à ton ami de renvoyer la vidéo.', 'sys');
-        setXfer('');
-        if (rmode === 'classic') setDrop('Transfert interrompu', 'Ton ami doit renvoyer la vidéo.', true);
+        // changement de qualité : l'ancien envoi est fermé juste avant que le nouveau arrive, on attend un peu avant de parler d'interruption
+        var rm = rmode;
+        setTimeout(function () {
+          if (done || gen !== recvGen) return;
+          addMsg('', 'Le transfert a été interrompu. Demande à ton ami de renvoyer la vidéo.', 'sys');
+          setXfer('');
+          if (rm === 'classic') setDrop('Transfert interrompu', 'Ton ami doit renvoyer la vidéo.', true);
+        }, 2500);
       }
     });
 
@@ -1378,7 +1485,11 @@
       var ok = !!window.MediaSource && m.tracks.every(function (t) { return MediaSource.isTypeSupported(t.mime); });
       if (!ok) { rmode = 'drop'; c.send(JSON.stringify({ k: 'fallback' })); return; }
       rmode = 'mse'; meta = m;
+      var resume = (hasVideo && video.readyState >= 1) ? { playing: !video.paused, time: video.currentTime } : null;   // changement de qualité : on reprend au même endroit
       resetVideo();
+      if (resume) { pendingState = resume; switchingUntil = Date.now() + 20000; }
+      onStreamQuality(m.q || 'orig', m.oh || 0, !!resume);
+      if ((m.q || 'orig') !== 'orig') setXfer('');                       // plus de pourcentage d'envoi/réception pour une qualité convertie
       var ms = new MediaSource();
       mse = { ms: ms, tracks: {}, ended: false, eosDone: false, duration: m.duration, ahead: Infinity, recv: 0, vtrack: null };
       lastReq = { t: -99, at: 0 };
@@ -1405,9 +1516,10 @@
       });
       video.src = URL.createObjectURL(ms);
       hasVideo = true;
+      renderQ();
       armPending();
       $('fname').textContent = m.name + ' · ' + fmtSize(m.size);
-      setDrop('Préparation de la vidéo', 'La lecture sera possible dans quelques secondes.', false, 0);
+      if (!resume) setDrop('Préparation de la vidéo', 'La lecture sera possible dans quelques secondes.', false, 0);
     }
     function onSegment(s) {
       if (!mse) return;
@@ -1417,10 +1529,12 @@
       else {
         var isNew = addSeg(tr, s.a, s.b, new Blob(s.pieces));
         if (isNew && tr === mse.vtrack) {
-          mse.recv += Math.max(0, s.b - s.a);
-          var pct = Math.min(99, Math.round(mse.recv / mse.duration * 100));
-          setXfer('Réception ' + pct + ' %');
-          if (!$('drop').hidden) $('prog').value = pct;
+          if (curQ === 'orig') {                                            // la progression n'est affichée que pour la vidéo d'origine
+            var got = 0; covRanges(tr).forEach(function (z) { got += z[1] - z[0]; });
+            var pct = Math.min(99, Math.round(got / mse.duration * 100));
+            setXfer('Réception ' + pct + ' %');
+            if (!$('drop').hidden) $('prog').value = pct;
+          }
         }
       }
       pump(tr);
@@ -1430,7 +1544,7 @@
       if (rmode === 'mse' && mse) {
         mse.ended = true;
         setXfer('');
-        addMsg('', 'Vidéo entièrement reçue.', 'sys');
+        if (curQ === 'orig') addMsg('', 'Vidéo entièrement reçue.', 'sys');
         Object.keys(mse.tracks).forEach(function (k) { pump(mse.tracks[k]); });
       } else if (rmode === 'classic' && meta) {
         var blob = new Blob(blobs.concat(parts), { type: mimeFor(meta.name, meta.type) });
@@ -1517,6 +1631,26 @@
     if (!mse) return;
     Object.keys(mse.tracks).forEach(function (k) { pump(mse.tracks[k]); });
   }
+  // zones de temps réellement reçues pour une piste (fusionnées) — sert au pourcentage et au diagnostic
+  function covRanges(tr) {
+    var r = [];
+    tr.segs.forEach(function (s) { var l = r[r.length - 1]; if (l && s.a <= l[1] + 0.15) l[1] = Math.max(l[1], s.b); else r.push([s.a, s.b]); });
+    return r;
+  }
+  function rangesStr(r) { return r.map(function (x) { return Math.round(x[0]) + '–' + Math.round(x[1]) + ' s'; }).join(' ; ') || 'rien'; }
+  function bufStr(b) { var r = []; for (var i = 0; i < b.length; i++) r.push([b.start(i), b.end(i)]); return rangesStr(r); }
+  // si la lecture reste figée avec une qualité convertie, on écrit ce qui a été reçu et ce que le lecteur a en mémoire
+  var stallSince = 0, lastDiag = 0;
+  setInterval(function () {
+    if (!mse || !hasVideo || video.paused || video.ended || video.readyState >= 3) { stallSince = 0; return; }
+    var now = Date.now(); if (!stallSince) stallSince = now;
+    if (now - stallSince < 8000 || now - lastDiag < 40000 || curQ === 'orig') return;
+    lastDiag = now;
+    var parts = [];
+    Object.keys(mse.tracks).forEach(function (k) { var t = mse.tracks[k]; parts.push((t === mse.vtrack ? 'image' : 'son') + ' reçu : ' + rangesStr(covRanges(t)) + (t.sb ? ' · en mémoire : ' + bufStr(t.sb.buffered) : '')); });
+    try { console.log('[qualité] lecture figée à ' + Math.round(video.currentTime) + ' s (état ' + video.readyState + '). ' + parts.join(' | ')); } catch (x) {}
+  }, 1000);
+
   // range un morceau reçu à sa place (par temps) ; false si on l'avait déjà
   function addSeg(tr, a, b, blob) {
     var arr = tr.segs, i = arr.length;
@@ -1552,6 +1686,13 @@
   video.addEventListener('seeking', onSeekish);
   video.addEventListener('waiting', onSeekish);
   video.addEventListener('loadeddata', function () { if (hasVideo) { $('drop').hidden = true; } });
+  video.addEventListener('loadedmetadata', function () {
+    if (mse && !mse.reported && video.videoWidth && !localFile) {
+      mse.reported = true;
+    }
+    renderQ();
+  });
+  video.addEventListener('resize', function () { renderQ(); });
 
   // petit trou entre deux morceaux (son ou image) : on saute par-dessus au lieu de rester bloqué
   setInterval(function () {
@@ -1585,6 +1726,7 @@
 
   /* ---------- lecture locale et synchronisation ---------- */
   function resetVideo() {
+    applyingUntil = Date.now() + 3000;                                   // la pause qui suit est faite par l'appli, pas par la personne : on ne l'envoie pas aux autres
     hasVideo = false; mse = null; pendingState = null;
     try { video.pause(); } catch (e) {}
     video.playbackRate = 1;
@@ -1610,9 +1752,10 @@
     fileToken++; sending = {}; haveKey = '';
     localFile = f;
     classicFor = {};
+    qGen++; qCache = {}; qJobs = {}; qChain = Promise.resolve(); sendKey = {}; qOwnerNote = ''; renderQ();   // nouveau film : les anciennes versions converties ne servent plus
     startVideo(URL.createObjectURL(typedBlob(f)), f.name + ' · ' + fmtSize(f.size));
     broadcast({ t: 'source', name: f.name });
-    openConns().forEach(function (c) { sendFileTo(c.peer); });
+    openConns().forEach(function (c) { sendBest(c.peer); });
     if (!openConns().length) addMsg('', "En attente d'un ami : la vidéo lui sera envoyée dès qu'il rejoint.", 'sys');
     else addMsg('', "Envoi de la vidéo à ton ami. Si le lecteur de ton ami attend des données, utilise « Synchroniser » pour vous recaler.", 'sys');
   }
@@ -1625,11 +1768,12 @@
   // action d'une personne (lecture, pause, saut) : envoyée aux autres
   function emit(force) {
     if (!hasVideo) return;
+    if (!force && Date.now() < switchingUntil) return;                    // changement de qualité en cours : aucune pause/saut n'est envoyé aux autres
     if (!force && (!userRecent() || Date.now() < applyingUntil)) return;
     broadcast(stateMsg());
   }
   ['play', 'pause', 'seeked'].forEach(function (ev) { video.addEventListener(ev, function () { emit(false); }); });
-  video.addEventListener('playing', function () { $('tap').hidden = true; });
+  video.addEventListener('playing', function () { $('tap').hidden = true; switchingUntil = 0; });
 
   // état reçu après une action de l'autre personne : on s'aligne tout de suite
   function applyState(s) {
@@ -1689,6 +1833,543 @@
   }
   video.addEventListener('play', keepAwake);
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && !video.paused) keepAwake(); });
+
+  /* =====================================================
+     QUALITÉ DE LECTURE
+     - Original : le fichier est transmis tel quel (aucun réencodage ; seul le découpage en fragments pour lire pendant la réception).
+     - 1080p / 720p / 480p / 360p : la personne qui a le fichier le convertit (WebCodecs, H.264, son conservé tel quel),
+       puis l'envoie à celui qui l'a demandé. Chacun choisit sa qualité ; la lecture reste synchronisée.
+     - Le bouton est intégré à la barre du lecteur (Plyr).
+     ===================================================== */
+  var QUALS = {
+    orig: { label: 'Original' },
+    '1080': { label: '1080p', h: 1080, bps: 5000000 },
+    '720': { label: '720p', h: 720, bps: 2500000 },
+    '480': { label: '480p', h: 480, bps: 1200000 },
+    '360': { label: '360p', h: 360, bps: 700000 },
+    '240': { label: '240p', h: 240, bps: 400000 },
+    '144': { label: '144p', h: 144, bps: 200000 }
+  };
+  var QORDER = ['orig', '1080', '720', '480', '360', '240', '144'];
+  var myQ = 'orig', curQ = 'orig', origH = 0, qNote = {}, qUI = null, qChosenAt = 0;
+  try { localStorage.removeItem('samaraf-quality'); } catch (e) {}   // toujours Original au départ
+  function qLabel(k) { return (QUALS[k] || QUALS.orig).label; }
+  function saveQ() { /* la qualité n'est plus mémorisée : on repart toujours d'Original */ }
+
+  /* ---------- interface ---------- */
+  function mountQualityUI() {
+    if (!plyrPlayer || qUI) return;
+    var ctrls = plyrPlayer.elements && plyrPlayer.elements.controls;
+    if (!ctrls) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'plyr__menu q-menu';
+    wrap.innerHTML =
+      '<button class="plyr__control q-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Qualité de lecture"><span class="q-cur">Orig.</span></button>' +
+      '<div class="plyr__menu__container q-pop" hidden><div><div role="menu" class="q-list"></div></div></div>';
+    var gear = ctrls.querySelector('.plyr__menu'), fs = ctrls.querySelector('[data-plyr="fullscreen"]');
+    ctrls.insertBefore(wrap, gear || fs || null);
+    qUI = { wrap: wrap, btn: wrap.querySelector('.q-btn'), cur: wrap.querySelector('.q-cur'), pop: wrap.querySelector('.q-pop'), list: wrap.querySelector('.q-list') };
+    function setOpen(o) { qUI.pop.hidden = !o; qUI.btn.setAttribute('aria-expanded', o ? 'true' : 'false'); }
+    qUI.close = function () { setOpen(false); };
+    qUI.btn.addEventListener('click', function (e) { e.stopPropagation(); renderQ(); setOpen(qUI.pop.hidden); });
+    qUI.list.addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('[data-q]');
+      if (!b || b.disabled) return;
+      e.stopPropagation(); setOpen(false); chooseQuality(b.getAttribute('data-q'));
+    });
+    document.addEventListener('click', function (e) { if (!qUI.pop.hidden && !wrap.contains(e.target)) setOpen(false); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !qUI.pop.hidden) setOpen(false); });
+    try { plyrPlayer.on('controlshidden', function () { setOpen(false); }); } catch (e) {}
+    renderQ();
+  }
+  function renderQ() {
+    if (!qUI) return;
+    var owner = !!localFile, html = '<div class="q-title">Qualité de lecture</div>';
+    // ce qui est affiché = ce qui est vraiment lu ; le choix qu'on vient de faire s'affiche en attendant son arrivée
+    var shown = owner ? 'orig' : ((hasVideo && myQ !== curQ && Date.now() - qChosenAt < 120000) ? myQ : (hasVideo ? curQ : myQ));
+    QORDER.forEach(function (k) {
+      if (k !== 'orig' && origH && QUALS[k].h >= origH - 8) return;               // inutile de proposer plus grand que la vidéo
+      var on = (k === shown), val = '';
+      if (k === 'orig' && origH) val = origH + 'p';
+      html += '<button type="button" role="menuitemradio" class="plyr__control" data-q="' + k + '" aria-checked="' + (on ? 'true' : 'false') + '"' +
+        (owner && k !== 'orig' ? ' disabled' : '') + '><span>' + QUALS[k].label + '<span class="plyr__menu__value">' + val + '</span></span></button>';
+    });
+    qUI.list.innerHTML = html;
+    // hôte uniquement : qualité choisie par chaque personne de la salle
+    if (isHost) {
+      var ps = openConns().filter(function (c) { return !c.dead; });
+      if (ps.length) {
+        var t = document.createElement('div'); t.className = 'q-title q-sep'; t.textContent = 'Dans la salle'; qUI.list.appendChild(t);
+        ps.forEach(function (c) {
+          var r = document.createElement('div'); r.className = 'q-peer';
+          var n = document.createElement('span'); n.className = 'q-pn'; n.textContent = c.peerName || 'Un ami';
+          var v = document.createElement('span'); v.className = 'q-pq'; v.textContent = qLabel(c.q || 'orig');
+          r.appendChild(n); r.appendChild(v); qUI.list.appendChild(r);
+        });
+      }
+    }
+    qUI.cur.textContent = shown === 'orig' ? 'Orig.' : QUALS[shown].label;
+  }
+  if (plyrPlayer) { mountQualityUI(); if (!qUI) { try { plyrPlayer.on('ready', mountQualityUI); } catch (e) {} } }
+
+  function chooseQuality(k) {
+    if (!QUALS[k] || k === myQ) return;
+    if (localFile && k !== 'orig') return;
+    myQ = k; qNote = {}; qChosenAt = Date.now(); saveQ(); renderQ();
+    if (!localFile) broadcast({ t: 'quality', q: k, pid: peer && peer.id, at: hasVideo ? Math.max(0, video.currentTime - 2) : 0 });
+  }
+  // une nouvelle version de la vidéo arrive (qualité reçue + hauteur de la vidéo d'origine)
+  function onStreamQuality(q, oh, switched) {
+    var changed = (q !== curQ);
+    curQ = q; if (oh) origH = oh;
+    renderQ();
+  }
+  // retour de la personne qui a le fichier : préparation en cours, impossible, ou déjà dans cette qualité
+  function onQState(d) {
+    if (localFile || d.q !== myQ) return;
+    if (d.st === 'prep') {
+      var first = !qNote[d.q]; qNote[d.q] = d.pct + ' %';
+      renderQ();
+    } else if (d.st === 'same') {
+      backToOriginal();
+    } else if (d.st === 'fail') {
+      try { console.warn('[qualité] ' + qLabel(d.q) + ' indisponible : ' + (d.msg || 'erreur')); } catch (x) {}
+      backToOriginal();
+    }
+  }
+  function backToOriginal() { myQ = 'orig'; qNote = {}; saveQ(); renderQ(); broadcast({ t: 'quality', q: 'orig', pid: peer && peer.id }); }
+
+  /* ---------- envoi : qui reçoit quoi ---------- */
+  function sendBest(pid) {
+    var k = qFor[pid] || 'orig';
+    if (k !== 'orig') serveQuality(pid, k);                          // qualité réduite : envoyée en direct pendant la conversion
+    else sendFileTo(pid, localFile, 'orig');
+  }
+  function serveQuality(pid, key, hint) {
+    if (!localFile || !peer) return;
+    if (!QUALS[key]) key = 'orig';
+    qFor[pid] = key;
+    if (sendKey[pid] === key) return;
+    if (key === 'orig') { sendFileTo(pid, localFile, 'orig', true); return; }
+    if (!canTranscode()) { qFor[pid] = 'orig'; broadcast({ t: 'qstate', q: key, st: 'fail', msg: "le navigateur de ton ami ne sait pas convertir la vidéo" }); return; }
+    var gen = qGen, S = getQuality(key, hint);
+    S.fresh = false;
+    S.ready.then(function () {
+      if (gen !== qGen || !localFile) return;
+      if (qFor[pid] !== key || sendKey[pid] === key) return;
+      sendFileTo(pid, S, key, true);                                 // on remplace l'envoi en cours par le flux converti
+    }, function (e) {
+      if (gen !== qGen) return;
+      if (e && e.same) { qFor[pid] = 'orig'; broadcast({ t: 'qstate', q: key, st: 'same' }); }
+    });
+  }
+  function qFailed(key, e) {
+    try { console.error('[qualité] conversion échouée', e); } catch (x) {}
+    var detail = (e && (e.message || e.name)) ? String(e.message || e.name).slice(0, 120) : String(e).slice(0, 120);
+    var why = e && e.message === 'mp4' ? 'fichier MP4 illisible pour la conversion' : e && e.message === 'decoder' ? 'ce format vidéo ne peut pas être converti ici' : e && e.message === 'audio' ? 'son non compatible (il faut de l\'AAC)' : e && e.message === 'encoder' ? 'conversion H.264 non prise en charge par ce navigateur' : 'erreur de conversion : ' + detail;
+    Object.keys(qFor).forEach(function (pid) { if (qFor[pid] === key) qFor[pid] = 'orig'; });
+    qOwnerNote = '';
+    broadcast({ t: 'qstate', q: key, st: 'fail', msg: why });
+    renderQ();
+  }
+  // un flux converti par qualité, partagé entre tous ceux qui le demandent (une seule conversion à la fois)
+  function makeStream(f, key) {
+    var S = { isStream: true, key: key, fresh: true, name: f.name.replace(/\.[^.]+$/, '') + ' (' + qLabel(key) + ').mp4', size: 0, duration: 0, oh: 0, tracks: null, items: [], done: false, error: null, waiters: [] };
+    S.notify = function () { var w = S.waiters; S.waiters = []; w.forEach(function (r) { r(); }); };
+    S.wait = function () { return new Promise(function (r) { S.waiters.push(r); }); };
+    S.ready = new Promise(function (res, rej) { S.resolveReady = res; S.rejectReady = rej; });
+    S.ready.catch(function () {});
+    return S;
+  }
+  function qWanted(key) { return Object.keys(qFor).some(function (p) { return qFor[p] === key; }); }
+  function getQuality(key, hint) {
+    var S = qCache[key];
+    if (S) return S;
+    var gen = qGen, f = localFile, lastSent = -1;
+    S = qCache[key] = makeStream(f, key);
+    S.startHint = hint > 0 ? hint : 0;                                 // on commence près de l'endroit où l'ami regarde
+    qChain = qChain.catch(function () {}).then(function () {
+      if (gen !== qGen || !qWanted(key)) throw new Error('stop');
+      return transcodeStream(S, f, function (pct) {
+        if (pct !== lastSent && (pct - lastSent >= 2 || pct >= 99)) { lastSent = pct; broadcast({ t: 'qstate', q: key, st: 'prep', pct: pct }); }
+      }, function () { return gen === qGen && qWanted(key); });
+    }).then(function () {
+      S.done = true; S.notify(); qOwnerNote = ''; renderQ();
+    }, function (e) {
+      S.error = e; S.notify(); S.rejectReady(e);
+      if (!(e && e.same) && qCache[key] === S) delete qCache[key];   // échec : on pourra réessayer ; « même taille » : on garde la réponse
+      if (gen === qGen && !(e && (e.same || e.message === 'stop'))) qFailed(key, e);
+    });
+    return S;
+  }
+
+  /* ---------- écriture de fragments MP4 (fMP4) : un fichier d'initialisation par piste + des fragments ---------- */
+  var FM = (function () {
+    function u8(n) { return [n & 255]; }
+    function u16(n) { return [(n >> 8) & 255, n & 255]; }
+    function u32(n) { return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255]; }
+    function u64(n) { return u32(Math.floor(n / 4294967296)).concat(u32(n >>> 0)); }
+    function s4(t) { return [t.charCodeAt(0), t.charCodeAt(1), t.charCodeAt(2), t.charCodeAt(3)]; }
+    function cat(parts) {
+      var n = 0, i, o, p;
+      for (i = 0; i < parts.length; i++) n += parts[i].length;
+      o = new Uint8Array(n); p = 0;
+      for (i = 0; i < parts.length; i++) { o.set(parts[i], p); p += parts[i].length; }
+      return o;
+    }
+    function box(type) {
+      var parts = [], n = 8;
+      for (var i = 1; i < arguments.length; i++) { var a = arguments[i]; a = (a instanceof Uint8Array) ? a : new Uint8Array(a); parts.push(a); n += a.length; }
+      return cat([new Uint8Array(u32(n).concat(s4(type))), cat(parts)]);
+    }
+    function full(type, ver, flags) {
+      var a = [new Uint8Array(u8(ver).concat([(flags >> 16) & 255, (flags >> 8) & 255, flags & 255]))];
+      for (var i = 3; i < arguments.length; i++) a.push(arguments[i]);
+      return box.apply(null, [type].concat(a));
+    }
+    function zeros(n) { return new Uint8Array(n); }
+    var MATRIX = new Uint8Array([0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x40, 0, 0, 0]);
+    function ftyp() { return box('ftyp', new Uint8Array(s4('isom').concat(u32(512), s4('isom'), s4('iso6'), s4('avc1'), s4('mp41')))); }
+    function mvhd() {
+      return full('mvhd', 0, 0, new Uint8Array([].concat(u32(0), u32(0), u32(1000), u32(0), u32(0x00010000), u16(0x0100), u16(0))), zeros(8), MATRIX, zeros(24), new Uint8Array(u32(3)));
+    }
+    function trak(id, w, h, isVideo, timescale, entry) {
+      var tkhd = full('tkhd', 0, 3, new Uint8Array([].concat(u32(0), u32(0), u32(id), u32(0), u32(0))), zeros(8),
+        new Uint8Array([].concat(u16(0), u16(0), u16(isVideo ? 0 : 0x0100), u16(0))), MATRIX, new Uint8Array(u32(w << 16).concat(u32(h << 16))));
+      var mdhd = full('mdhd', 0, 0, new Uint8Array([].concat(u32(0), u32(0), u32(timescale), u32(0), u16(0x55c4), u16(0))));
+      var hdlr = full('hdlr', 0, 0, new Uint8Array([].concat(u32(0), s4(isVideo ? 'vide' : 'soun'))), zeros(12), new Uint8Array((isVideo ? 'VideoHandler' : 'SoundHandler').split('').map(function (c) { return c.charCodeAt(0); }).concat([0])));
+      var mhd = isVideo ? full('vmhd', 0, 1, zeros(8)) : full('smhd', 0, 0, zeros(4));
+      var dinf = box('dinf', full('dref', 0, 0, new Uint8Array(u32(1)), full('url ', 0, 1)));
+      var stbl = box('stbl', full('stsd', 0, 0, new Uint8Array(u32(1)), entry), full('stts', 0, 0, new Uint8Array(u32(0))),
+        full('stsc', 0, 0, new Uint8Array(u32(0))), full('stsz', 0, 0, new Uint8Array(u32(0).concat(u32(0)))), full('stco', 0, 0, new Uint8Array(u32(0))));
+      return box('trak', tkhd, box('mdia', mdhd, hdlr, box('minf', mhd, dinf, stbl)));
+    }
+    function trex(id) { return full('trex', 0, 0, new Uint8Array([].concat(u32(id), u32(1), u32(0), u32(0), u32(0)))); }
+    // piste vidéo H.264 : avcC = description donnée par l'encodeur
+    function initVideo(id, w, h, avcC, timescale) {
+      var entry = box('avc1', zeros(6), new Uint8Array(u16(1)), zeros(16), new Uint8Array(u16(w).concat(u16(h), u32(0x00480000), u32(0x00480000), u32(0), u16(1))),
+        zeros(32), new Uint8Array(u16(0x0018).concat(u16(0xffff))), box('avcC', avcC));
+      return cat([ftyp(), box('moov', mvhd(), trak(id, w, h, true, timescale, entry), box('mvex', trex(id)))]);
+    }
+    // piste audio : « entry » = boîte mp4a complète recopiée de la vidéo d'origine
+    function initAudio(id, timescale, entry) {
+      return cat([ftyp(), box('moov', mvhd(), trak(id, 0, 0, false, timescale, entry), box('mvex', trex(id)))]);
+    }
+    // samples : [{ data: Uint8Array, dur: ticks, key: bool }]
+    function fragment(id, seq, baseTime, samples) {
+      var n = samples.length, i, trunBody = [];
+      trunBody.push(new Uint8Array(u32(n).concat(u32(0))));                 // nombre d'échantillons + data_offset (rempli après)
+      var rows = new Uint8Array(n * 12), dv = new DataView(rows.buffer), dsz = 0;
+      for (i = 0; i < n; i++) {
+        dv.setUint32(i * 12, samples[i].dur >>> 0);
+        dv.setUint32(i * 12 + 4, samples[i].data.length);
+        dv.setUint32(i * 12 + 8, samples[i].key ? 0x02000000 : 0x01010000);
+        dsz += samples[i].data.length;
+      }
+      var tfhd = full('tfhd', 0, 0x020000, new Uint8Array(u32(id)));
+      var tfdt = full('tfdt', 1, 0, new Uint8Array(u64(baseTime)));
+      var trun = full('trun', 0, 0x000701, trunBody[0], rows);
+      var mfhd = full('mfhd', 0, 0, new Uint8Array(u32(seq)));
+      var moof = box('moof', mfhd, box('traf', tfhd, tfdt, trun));
+      // data_offset = taille de moof + en-tête de mdat (8)
+      var off = moof.length + 8;
+      var offPos = moof.length - rows.length - 4;                           // position du data_offset dans trun
+      new DataView(moof.buffer, moof.byteOffset).setUint32(offPos, off);
+      var mdat = new Uint8Array(8 + dsz), p = 8;
+      new DataView(mdat.buffer).setUint32(0, 8 + dsz); mdat.set(s4('mdat'), 4);
+      for (i = 0; i < n; i++) { mdat.set(samples[i].data, p); p += samples[i].data.length; }
+      return cat([moof, mdat]);
+    }
+    // entrée audio AAC « mp4a » + esds, construite à partir de la configuration audio (ASC)
+    function audioEntry(channels, sampleRate, asc) {
+      var al = asc.length, dcl = 13 + 2 + al, esl = 3 + 2 + dcl + 3;
+      var esds = full('esds', 0, 0, new Uint8Array([].concat([0x03, esl], u16(0), [0], [0x04, dcl, 0x40, 0x15], [0, 0, 0], u32(0), u32(0), [0x05, al])), asc, new Uint8Array([0x06, 0x01, 0x02]));
+      return box('mp4a', zeros(6), new Uint8Array(u16(1)), zeros(8), new Uint8Array(u16(channels).concat(u16(16), u16(0), u16(0), u32((sampleRate & 0xffff) * 65536))), esds);
+    }
+    return { initVideo: initVideo, initAudio: initAudio, fragment: fragment, audioEntry: audioEntry };
+  })();
+
+  // Découpe en direct : la vidéo est coupée à chaque image clé (≈ 2 s), le son tous les ≈ 2 s ; chaque morceau est ajouté à S.items
+  // dès qu'il est prêt (le fichier d'initialisation de chaque piste passe en premier).
+  function makeSegmenter(S, o) {
+    var vbuf = [], abuf = [], vSeq = 1, aSeq = 1, haveInit = false, lastVdts = -1, aFirst = true;
+    function push(id, init, buf, a, b) { S.items.push({ id: id, init: init, buf: buf, a: a, b: b }); S.notify(); }
+    function hex(n) { return ('0' + n.toString(16)).slice(-2); }
+    function flushV(nextDts) {
+      if (!vbuf.length) return;
+      var samples = [], base = vbuf[0].dts, total = 0, last = vbuf.length - 1;
+      for (var i = 0; i <= last; i++) {
+        var dur = i < last ? vbuf[i + 1].dts - vbuf[i].dts : (nextDts !== null ? nextDts - vbuf[i].dts : (Math.round(vbuf[i].durUs * 0.09) || 3000));
+        dur = Math.max(1, dur); total += dur;
+        samples.push({ data: vbuf[i].data, dur: dur, key: vbuf[i].key });
+      }
+      vbuf = [];
+      push(1, false, FM.fragment(1, vSeq++, base, samples), base / 90000, (base + total) / 90000);
+      if (o.onVideoSeg) o.onVideoSeg(base / 90000, (base + total) / 90000);
+    }
+    function flushA(all) {
+      if (!haveInit || !o.audio) return;
+      var ts = o.audio.timescale;
+      while (abuf.length) {
+        var n = 0, d = 0, need = (aFirst ? 0.8 : 2) * ts;                // 1er morceau de son plus court : la lecture repart plus vite
+        while (n < abuf.length && d < need) { d += abuf[n].dur; n++; }
+        if (d < need && !all) return;
+        aFirst = false;
+        var part = abuf.splice(0, n), base = part[0].dts, sum = 0;
+        part.forEach(function (s) { sum += s.dur; });
+        push(2, false, FM.fragment(2, aSeq++, base, part.map(function (s) { return { data: s.data, dur: Math.max(1, s.dur), key: true }; })), base / ts, (base + sum) / ts);
+      }
+    }
+    return {
+      video: function (data, key, tsUs, durUs, avcC) {
+        if (!haveInit) {
+          if (!avcC) throw new Error('encoder');
+          var tracks = [{ id: 1, kind: 'video', mime: 'video/mp4; codecs="avc1.' + hex(avcC[1]) + hex(avcC[2]) + hex(avcC[3]) + '"', timescale: 90000 }];
+          push(1, true, FM.initVideo(1, o.w, o.h, avcC, 90000), 0, 0);
+          if (o.audio) {
+            tracks.push({ id: 2, kind: 'audio', mime: 'audio/mp4; codecs="' + o.audio.codec + '"', timescale: o.audio.timescale });
+            push(2, true, FM.initAudio(2, o.audio.timescale, FM.audioEntry(o.audio.channels, o.audio.sampleRate, o.audio.asc)), 0, 0);
+          }
+          haveInit = true;
+          o.onInit(tracks);
+          flushA(false);
+        }
+        var dts = Math.max(Math.round(tsUs * 0.09), lastVdts + 1); lastVdts = dts;     // 90 kHz, toujours croissant
+        if (key && vbuf.length) flushV(dts);
+        vbuf.push({ data: data, key: key, dts: dts, durUs: durUs });
+      },
+      audio: function (data, dts, dur) { abuf.push({ data: data, dts: dts, dur: dur }); flushA(false); },
+      cut: function () { flushV(null); flushA(true); lastVdts = -1; aFirst = true; },       // fin d'une session de conversion (fin du film, saut, ou zone déjà faite)
+      end: function () { flushV(null); flushA(true); }
+    };
+  }
+
+  /* ---------- conversion en direct (WebCodecs) : décodage → réduction → H.264 ; le son AAC est copié sans changement ---------- */
+  function canTranscode() { return !!(window.VideoDecoder && window.VideoEncoder && window.VideoFrame && window.EncodedVideoChunk && window.MP4Box && window.DataStream); }
+  function boxPayload(box) {                                             // contenu d'une « boîte » mp4 (sans son en-tête de 8 octets)
+    var ds = new DataStream(undefined, 0, DataStream.BIG_ENDIAN);
+    box.write(ds);
+    return new Uint8Array(ds.buffer, 8);
+  }
+  function videoDesc(mp4, id) {
+    var e = mp4.getTrackById(id).mdia.minf.stbl.stsd.entries[0], b = e.avcC || e.hvcC || e.vpcC || e.av1C;
+    return b ? boxPayload(b) : null;
+  }
+  function audioDesc(mp4, id) {
+    try {
+      var e = mp4.getTrackById(id).mdia.minf.stbl.stsd.entries[0], d = e.esds.esd.descs[0].descs[0].data;
+      return d && d.length ? new Uint8Array(d) : null;
+    } catch (x) { return null; }
+  }
+  async function transcodeStream(S, f, onPct, alive) {
+    var Q = QUALS[S.key], cfg = null, seg = null, covered = [], guard = 0, sess = null;
+    S.seekReq = null; S.cur = { a0: null, a1: null };
+    function addCovered(a, b) {
+      var na = a, nb = b, keep = [];
+      covered.forEach(function (z) {
+        if (z[1] >= na - 0.1 && z[0] <= nb + 0.1) { na = Math.min(na, z[0]); nb = Math.max(nb, z[1]); } else keep.push(z);
+      });
+      keep.push([na, nb]); keep.sort(function (x, y) { return x[0] - y[0]; });
+      covered = keep;
+    }
+    function covSum() { var n = 0, d = cfg ? cfg.dur : 1; covered.forEach(function (z) { n += Math.max(0, Math.min(z[1], d) - z[0]); }); return n; }
+    S.inCovered = function (t) { for (var i = 0; i < covered.length; i++) { if (t >= covered[i][0] - 0.1 && t <= covered[i][1] + 0.1) return true; } return false; };
+    // l'ami saute vers une partie pas encore convertie : la conversion repart de là, les trous sont comblés ensuite
+    S.requestSeek = function (t) {
+      if (!(t >= 0) || S.inCovered(t)) return;
+      if (S.lastRestart && Date.now() - S.lastRestart.at < 3000 && Math.abs(t - S.lastRestart.t) < 20) return;   // pas de relances en rafale
+      if (S.warmUntil && Date.now() < S.warmUntil && S.cur.a0 !== null && t >= S.cur.a0 - 0.1 && t <= S.cur.a0 + 40) return;   // reprise qui démarre : on la laisse finir
+      if (S.cur.a0 !== null && t >= S.cur.a0 - 0.1 && t <= S.cur.a1 + 5) return;
+      S.seekReq = t;
+    };
+    function nextGap() {
+      if (!covered.length) return 0;
+      if (covered[0][0] > 0.5) return 0;
+      if (covered[0][1] < Infinity) return covered[0][1];
+      return null;
+    }
+
+    async function runSession(startAt) {
+      var mp4 = MP4Box.createFile(), info = null, bad = null, err = null, vq = [], aq = [], lastDts = {}, lastV = startAt;
+      var v = null, a = null, dec = null, enc = null, cvs = null, ctx = null, nIn = 0, started = false, stopAt = Infinity, reachedEof = false;
+      var startUs = startAt * 1e6, sinceKey = 0, firstGop = true;
+      covered.forEach(function (z) { if (z[0] > startAt + 0.05 && z[0] < stopAt) stopAt = z[0]; });   // on s'arrête en rejoignant une zone déjà faite
+      sess = { a0: null };
+      S.cur = { a0: startAt, a1: startAt + 3 }; S.warmUntil = Date.now() + 20000;                          // la reprise est en cours : les demandes proches ne la relancent pas
+      function chk() { if (!alive()) throw new Error('stop'); if (err) throw err; }
+      mp4.onError = function () { bad = new Error('mp4'); };
+      mp4.onReady = function (i) { info = i; };
+      mp4.onSamples = function (id, user, samples) {
+        var q = (v && id === v.id) ? vq : aq;
+        for (var i = 0; i < samples.length; i++) {                      // on copie les champs utiles AVANT de libérer : la libération vide sample.data
+          var m = samples[i], dkey = 'd' + id;
+          if (lastDts[dkey] !== undefined && m.dts <= lastDts[dkey]) continue;   // échantillon déjà reçu (relecture) : ignoré
+          lastDts[dkey] = m.dts;
+          q.push({ data: m.data, is_sync: m.is_sync, cts: m.cts, dts: m.dts, duration: m.duration, timescale: m.timescale });
+        }
+        try { mp4.releaseUsedSamples(id, samples[samples.length - 1].number + 1); } catch (e) {}
+      };
+      async function setup() {
+        v = info.videoTracks[0]; a = info.audioTracks[0];
+        if (!v) throw new Error('decoder');
+        if (!cfg) {                                                      // réglages calculés une seule fois (première session)
+          var sw = v.video.width, sh = v.video.height, c0 = {};
+          if (sh <= Q.h + 8) { var sm = new Error('same'); sm.same = true; throw sm; }   // déjà aussi petite : on garde l'original
+          c0.h = Math.round(Q.h / 2) * 2; c0.w = Math.round(sw * Q.h / sh / 2) * 2;
+          c0.dur = Math.max(1, info.duration / info.timescale);
+          var fps = v.nb_samples / Math.max(1, v.duration / v.timescale);
+          if (!(fps >= 10 && fps <= 120)) fps = 30;
+          c0.gop = Math.max(12, Math.round(fps * 2));
+          c0.dcfg = { codec: v.codec, codedWidth: sw, codedHeight: sh };
+          var vd = videoDesc(mp4, v.id); if (vd) c0.dcfg.description = vd;
+          var ds = await VideoDecoder.isConfigSupported(c0.dcfg);
+          if (!ds || !ds.supported) throw new Error('decoder');
+          var tries = [['avc1.4d002a', 'no-preference'], ['avc1.42002a', 'no-preference'], ['avc1.4d002a', 'prefer-software'], ['avc1.42002a', 'prefer-software'], ['avc1.64002a', 'no-preference']];
+          for (var i = 0; i < tries.length && !c0.ecfg; i++) {
+            var c = { codec: tries[i][0], width: c0.w, height: c0.h, bitrate: Math.round(Q.bps * (fps > 40 ? 1.5 : 1)), framerate: Math.round(fps), latencyMode: 'realtime', hardwareAcceleration: tries[i][1], avc: { format: 'avc' } };
+            try { var es = await VideoEncoder.isConfigSupported(c); if (es && es.supported) c0.ecfg = c; } catch (e) {}
+          }
+          if (!c0.ecfg) throw new Error('encoder');
+          c0.ainfo = null;
+          if (a) {
+            var asc = audioDesc(mp4, a.id);
+            if (!/^mp4a\.40/i.test(a.codec) || !asc) throw new Error('audio');
+            c0.ainfo = { codec: a.codec, timescale: a.timescale, channels: a.audio.channel_count, sampleRate: a.audio.sample_rate, asc: asc };
+          }
+          S.duration = c0.dur; S.oh = sh; S.size = Math.round(c0.dur * (Q.bps / 8 + 16000));
+          seg = makeSegmenter(S, {
+            w: c0.w, h: c0.h, audio: c0.ainfo,
+            onInit: function (tracks) { S.tracks = tracks; S.resolveReady(); },
+            onVideoSeg: function (x, y) {
+              addCovered(x, y); S.warmUntil = 0;
+              if (sess && sess.a0 === null) sess.a0 = x;
+              S.cur = { a0: sess ? sess.a0 : x, a1: y };
+            }
+          });
+          cfg = c0;
+        }
+        cvs = (window.OffscreenCanvas ? new OffscreenCanvas(cfg.w, cfg.h) : Object.assign(document.createElement('canvas'), { width: cfg.w, height: cfg.h }));
+        ctx = cvs.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+        enc = new VideoEncoder({
+          output: function (chunk, meta) {
+            try {
+              var data = new Uint8Array(chunk.byteLength); chunk.copyTo(data);
+              var desc = meta && meta.decoderConfig && meta.decoderConfig.description;
+              var avcC = desc ? new Uint8Array(desc.buffer ? desc.buffer.slice(desc.byteOffset, desc.byteOffset + desc.byteLength) : desc.slice(0)) : null;
+              seg.video(data, chunk.type === 'key', chunk.timestamp, chunk.duration || 0, avcC);
+            } catch (e) { err = e; }
+          },
+          error: function (e) { err = e; }
+        });
+        enc.configure(cfg.ecfg);
+        dec = new VideoDecoder({
+          output: function (frame) {
+            try {
+              if (frame.timestamp < startUs - 50000) { frame.close(); return; }   // avant la position demandée : sert seulement de référence au décodage, pas converti
+              ctx.drawImage(frame, 0, 0, cfg.w, cfg.h);
+              var nf = new VideoFrame(cvs, { timestamp: frame.timestamp, duration: frame.duration || undefined });
+              var kf = nIn === 0 || sinceKey >= (firstGop ? Math.round(cfg.gop / 2) : cfg.gop);   // 1er morceau plus court : la lecture repart plus vite
+              if (kf && nIn > 0) firstGop = false;
+              sinceKey = kf ? 1 : sinceKey + 1; nIn++;
+              enc.encode(nf, { keyFrame: kf });
+              nf.close();
+            } catch (e) { err = e; }
+            frame.close();
+          },
+          error: function (e) { err = e; }
+        });
+        dec.configure(cfg.dcfg);
+        mp4.setExtractionOptions(v.id, null, { nbSamples: 25 });
+        if (a) mp4.setExtractionOptions(a.id, null, { nbSamples: 50 });
+      }
+      async function drain() {
+        while (aq.length) { var as = aq.shift(); seg.audio(new Uint8Array(as.data), as.dts, as.duration); }
+        while (vq.length) {
+          chk();
+          if (S.seekReq !== null) return;
+          while (dec.decodeQueueSize > 20 || enc.encodeQueueSize > 12) { await sleep(4); chk(); if (S.seekReq !== null) return; }
+          var sm = vq.shift();
+          dec.decode(new EncodedVideoChunk({ type: sm.is_sync ? 'key' : 'delta', timestamp: Math.round(1e6 * sm.cts / sm.timescale), duration: Math.round(1e6 * sm.duration / sm.timescale), data: sm.data }));
+          lastV = sm.cts / sm.timescale;
+          if (lastV >= stopAt) { vq.length = 0; aq.length = 0; return; }
+        }
+        onPct(Math.max(0, Math.min(99, Math.round(covSum() / (cfg ? cfg.dur : 1) * 100))));
+      }
+      try {
+        var off = 0, SL = 4 * 1048576;
+        for (;;) {
+          chk(); if (bad) throw bad;
+          if (S.seekReq !== null || lastV >= stopAt) break;
+          if (off >= f.size) { reachedEof = true; break; }
+          var len = Math.min(SL, f.size - off);
+          var ab = await f.slice(off, off + len).arrayBuffer();
+          ab.fileStart = off;
+          var next = mp4.appendBuffer(ab);
+          if (bad) throw bad;
+          if (info && !started) {
+            started = true;
+            await setup();
+            mp4.start();
+            off = mp4.seek(startAt, true).offset;
+          } else off = (typeof next === 'number' && next > off + len) ? next : off + len;
+          if (started) await drain();
+        }
+        if (!started) { if (S.seekReq !== null) return 'seek'; throw new Error('mp4'); }
+        if (reachedEof) { mp4.flush(); await drain(); }
+        await dec.flush(); chk();
+        await enc.flush(); chk();
+        seg.cut();
+        if (reachedEof) addCovered(sess.a0 !== null ? sess.a0 : startAt, Infinity);   // jusqu'à la fin du film
+        return S.seekReq !== null ? 'seek' : 'end';
+      } finally {
+        try { if (dec && dec.state !== 'closed') dec.close(); } catch (e) {}
+        try { if (enc && enc.state !== 'closed') enc.close(); } catch (e) {}
+      }
+    }
+
+    var startAt = Math.max(0, S.startHint || 0);
+    if (startAt < 3) startAt = 0;
+    for (;;) {
+      if (!alive()) throw new Error('stop');
+      var r = await runSession(startAt);
+      if (r === 'seek') {
+        var q = S.seekReq; S.seekReq = null;
+        if (!S.inCovered(q)) {
+          startAt = q; S.lastRestart = { at: Date.now(), t: q };
+          continue;
+        }
+      }
+      var g = nextGap();
+      if (g === null || ++guard > 400) break;
+      startAt = g;
+    }
+    onPct(100);
+  }
+
+  // envoi d'un flux converti : chaque morceau part dès qu'il existe ; le lecteur de l'ami démarre sans attendre la fin
+  async function sendQStream(c, tok, st, S) {
+    var dc = c.dataChannel, i = 0;
+    st.seek = function (t) { if (S.requestSeek) S.requestSeek(t); };       // saut de l'ami : la conversion repart de là
+    await S.ready;
+    c.send(JSON.stringify({ k: 'init', name: S.name, size: S.size, duration: S.duration, tracks: S.tracks, q: S.key, oh: S.oh }));
+    for (;;) {
+      checkAlive(c, tok);
+      if (st.fallback) throw new Error('fb');
+      if (i < S.items.length) {
+        var it = S.items[i++], buf = it.buf;
+        c.send(JSON.stringify({ k: 'seg', id: it.id, init: it.init, len: buf.byteLength, a: it.a, b: it.b }));
+        for (var o = 0; o < buf.byteLength; o += CH) {
+          while (dc.bufferedAmount > 4 * 1048576) { await sleep(20); checkAlive(c, tok); if (st.fallback) throw new Error('fb'); }
+          c.send(buf.slice(o, o + CH).buffer);
+        }
+      } else if (S.error) throw S.error;
+      else if (S.done) break;
+      else await Promise.race([S.wait(), sleep(1000)]);
+    }
+    c.send(JSON.stringify({ k: 'end' }));
+    while (dc.bufferedAmount > 0) { await sleep(50); checkAlive(c, tok); }
+    return true;
+  }
 
   /* =====================================================
      YOUTUBE
@@ -2039,15 +2720,83 @@
 
   /* ---------- plein écran (vidéo + chat) ---------- */
   function isFs() { return document.fullscreenElement === layout || document.webkitFullscreenElement === layout || pseudoFs; }
+  // téléphone : en plein écran, l'écran passe en paysage tout seul (Android/Chrome). Sur iPhone, le CSS fait pivoter la salle.
+  // Un seul mécanisme à la fois, pour éviter que la vidéo pivote puis revienne :
+  // 1) on demande le verrouillage en paysage au système ; 2) seulement si l'écran reste en portrait après cela, on fait pivoter la salle avec le CSS (classe « rot »).
+  var fsWas = false, orient = { want: false, settled: false, locked: false, tm: null };
+  function devicePortrait() {
+    try { var ty = screen.orientation && screen.orientation.type; if (ty) return ty.indexOf('portrait') === 0; } catch (e) {}
+    return window.innerHeight > window.innerWidth;
+  }
+  function applyRot() {
+    layout.classList.toggle('rot', !!(orient.want && orient.settled && pseudoFs && devicePortrait()));
+  }
+  // la salle ne pivote en paysage que si la vidéo est en paysage (largeur ≥ hauteur) ; une vidéo verticale reste en portrait
+  function videoLandscape() {
+    if (yt.active) return true;
+    if (hasVideo && video.videoWidth && video.videoHeight) return video.videoWidth >= video.videoHeight;
+    return true;
+  }
+  // si les dimensions de la vidéo ne sont connues qu'après coup (ou si la vidéo change), on réévalue en plein écran
+  video.addEventListener('loadedmetadata', function () {
+    /* pas de rotation en plein écran avec chat */
+  });
+  function setLandscape(on) {
+    on = on && videoLandscape();
+    clearTimeout(orient.tm);
+    orient.want = on; orient.settled = false;
+    if (!on) {
+      if (orient.locked) { try { screen.orientation.unlock(); } catch (e) {} orient.locked = false; }
+      applyRot(); return;
+    }
+    function settle() {
+      orient.settled = true;
+      // plein écran réel mais l'écran est resté en portrait : on passe en plein écran simulé et on pivote avec le CSS
+      if (orient.want && devicePortrait() && !pseudoFs && isFs()) {
+        pseudoFs = true;
+        try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) {}
+        syncFs();
+      }
+      applyRot();
+    }
+    function finish(ok, delay) { orient.locked = !!ok; orient.tm = setTimeout(settle, delay); }
+    var p = null;
+    try {
+      if (window.matchMedia('(pointer: coarse)').matches && screen.orientation && screen.orientation.lock) p = screen.orientation.lock('landscape');
+    } catch (e) { p = null; }
+    if (p && p.then) p.then(function () { finish(true, 700); }, function () { finish(false, 0); });   // 700 ms : le temps que l'écran pivote vraiment
+    else finish(false, 0);
+  }
+  window.addEventListener('resize', applyRot);
+  window.addEventListener('orientationchange', function () { setTimeout(applyRot, 200); });
+  /* menu du haut (plein écran + chat) : s'affiche à l'entrée, se range derrière la flèche après quelques secondes, et s'ouvre à la demande */
+  var fsHideTm = null;
+  function armFsHide(ms) {
+    clearTimeout(fsHideTm);
+    fsHideTm = setTimeout(function () {
+      if (!isFs()) return;
+      if ($('sizebar').classList.contains('open')) { armFsHide(2500); return; }   // le panneau Taille est ouvert : on ne range pas le menu
+      fsMenu(false);
+    }, ms || 4000);
+  }
+  function fsMenu(open) {
+    clearTimeout(fsHideTm);
+    $('fsbar').classList.toggle('hide', !open);
+    $('fs-tab').setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) armFsHide(3500);
+  }
   function syncFs() {
     var on = isFs();
+    // plein écran avec chat (bouton du dessous) : l'écran ne pivote jamais, la vidéo garde son orientation
+    if (on !== fsWas) { fsWas = on; setLandscape(false); if (on) fsMenu(true); else { clearTimeout(fsHideTm); $('fsbar').classList.remove('hide'); } }
     layout.classList.toggle('fs', on);
     layout.classList.toggle('pfs', pseudoFs);
+    applyRot();
     $('btn-full').textContent = on ? 'Quitter le plein écran' : 'Plein écran';
     // le panneau taille/zoom est déplacé dans la scène en plein écran, puis remis à sa place
-    var sb = $('sizebar'), stg = $('stage');
-    if (on && sb.parentNode !== stg) { stg.appendChild(sb); sb.classList.add('fs-panel'); }
-    else if (!on && sb.parentNode === stg) { sb.classList.remove('fs-panel', 'open'); layout.querySelector('.stage-col').appendChild(sb); }
+    var sb = $('sizebar'), fm = $('fsmenu');
+    if (on && sb.parentNode !== fm) { fm.appendChild(sb); sb.classList.add('fs-panel'); }
+    else if (!on && sb.parentNode === fm) { sb.classList.remove('fs-panel', 'open'); layout.querySelector('.stage-col').appendChild(sb); }
   }
   function toggleFs() {
     if (isFs()) {
@@ -2072,6 +2821,21 @@
     $('btn-chat').textContent = hide ? 'Afficher le chat' : 'Masquer le chat';
     $('fs-chat').textContent = hide ? 'Afficher le chat' : 'Masquer le chat';
   }
+
+  /* ---------- taille de la zone de chat ---------- */
+  var CHAT_SIZES = ['Petit', 'Moyen', 'Grand', 'Très grand'], chatLvl = 1;
+  try { var sv = parseInt(localStorage.getItem('samaraf-chatsize'), 10); if (sv >= 0 && sv < CHAT_SIZES.length) chatLvl = sv; } catch (e) {}
+  function setChatLvl(n) {
+    chatLvl = n;
+    layout.setAttribute('data-chat', String(n));
+    $('chatsize').value = String(n);
+    try { localStorage.setItem('samaraf-chatsize', String(n)); } catch (e) {}
+  }
+  setChatLvl(chatLvl);
+  $('chatsize').addEventListener('change', function (e) {
+    if (layout.classList.contains('nochat')) toggleChat();                 // chat masqué : choisir une taille le réaffiche
+    setChatLvl(parseInt(e.target.value, 10));
+  });
 
   /* ---------- interface ---------- */
   $('btn-create').addEventListener('click', function () {
@@ -2120,6 +2884,11 @@
   $('btn-chat').addEventListener('click', toggleChat);
   $('fs-chat').addEventListener('click', toggleChat);
   $('fs-size').addEventListener('click', function () { $('sizebar').classList.toggle('open'); });
+  $('fs-tab').addEventListener('click', function () { fsMenu($('fsbar').classList.contains('hide')); });
+  // tant que l'utilisateur touche au menu, on repousse le rangement automatique
+  ['pointerdown', 'pointermove', 'input', 'focusin'].forEach(function (ev) {
+    $('fsmenu').addEventListener(ev, function () { if (!$('fsbar').classList.contains('hide')) armFsHide(4000); });
+  });
   $('btn-full').addEventListener('click', toggleFs);
   $('fs-exit').addEventListener('click', toggleFs);
   $('btn-opts').addEventListener('click', function () { $('sizebar').classList.toggle('show'); });
@@ -2212,6 +2981,65 @@
   });
 
   if (window.__theme) window.__theme.bind(broadcast, openConns, function (t) { addMsg('', t, 'sys'); }, function () { return isHost; });
+
+  /* ---------- clavier du téléphone ----------
+     Deux cas :
+     1) le clavier redimensionne la page (navigateur, ou appli en « adjustResize ») : la salle suit la hauteur visible ;
+     2) le clavier se pose par-dessus sans rien redimensionner (WebView d'une appli) : on le détecte au focus du champ
+        et on réserve en bas une hauteur égale à celle du clavier (mesurée si possible, sinon estimée). */
+  (function () {
+    var vv = window.visualViewport, root = document.documentElement.style;
+    var baseH = window.innerHeight, focused = false, settled = false, vkH = 0, tSettle = null, tBlur = null, sawResize = false;
+    function closeKb() {                                                   // le clavier est fermé : le champ perd le focus et la mise en page revient
+      focused = false; settled = false; sawResize = false; vkH = 0;
+      try { if (isText(document.activeElement)) document.activeElement.blur(); } catch (e) {}
+      fit();
+    }
+    // PC (grand écran + souris) : pas de clavier virtuel, donc aucune hauteur n'est réservée et la salle ne rétrécit pas
+    function isDesk() { try { return window.matchMedia('(min-width: 861px) and (pointer: fine)').matches; } catch (e) { return false; } }
+    function isText(el) { return el && el.tagName === 'INPUT' && (el.type === 'text' || el.type === 'search' || el.type === 'url'); }
+    function fit() {
+      var h = vv ? vv.height : window.innerHeight, t = vv ? vv.offsetTop : 0;
+      var zoomed = !!(vv && vv.scale > 1.05), cur = Math.min(window.innerHeight, h);
+      if (!focused && !zoomed) baseH = Math.max(cur, 1);                  // hauteur sans clavier
+      var resized = baseH - cur > 120, pad = 0;
+      if (isDesk()) { resized = false; sawResize = false; }
+      if (focused && resized) sawResize = true;
+      else if (focused && sawResize && !resized) { closeKb(); return; }     // la page a retrouvé sa taille : clavier fermé (touche retour)
+      if (!isDesk() && focused && settled && !zoomed && !resized) pad = vkH > 0 ? vkH : Math.round(baseH * 0.42);
+      root.setProperty('--vvh', Math.round(h) + 'px');
+      root.setProperty('--vvt', Math.round(t) + 'px');
+      root.setProperty('--kbpad', pad + 'px');
+      // plein écran réel : le clavier recouvre le bas de l'écran sans redimensionner la page → on mesure ce qu'il cache
+      root.setProperty('--kbov', ((!isDesk() && !zoomed) ? Math.max(0, Math.round(window.innerHeight - h - t)) : 0) + 'px');
+      var kb = !zoomed && (focused || resized);
+      if (isDesk()) { root.setProperty('--vvh', '100dvh'); root.setProperty('--vvt', '0px'); kb = false; }
+      if (kb && !document.body.classList.contains('kb') && isFs()) fsMenu(false);   // le clavier s'ouvre : le menu se range pour laisser la place
+      document.body.classList.toggle('kb', kb);
+      if (kb) { var m = $('msgs'); m.scrollTop = m.scrollHeight; }
+    }
+    document.addEventListener('focusin', function (e) {
+      if (!isText(e.target)) return;
+      clearTimeout(tBlur); clearTimeout(tSettle);
+      focused = true; settled = false; fit();
+      tSettle = setTimeout(function () { settled = true; fit(); }, 600);   // on laisse au clavier le temps de redimensionner la page
+    });
+    document.addEventListener('focusout', function (e) {
+      if (!isText(e.target)) return;
+      clearTimeout(tBlur);
+      tBlur = setTimeout(function () { if (!isText(document.activeElement)) { focused = false; settled = false; fit(); } }, 250);
+    });
+    if (vv) { vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); }
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', function () { setTimeout(function () { if (!focused) baseH = window.innerHeight; fit(); }, 300); });
+    try {                                                                  // hauteur exacte du clavier quand le système la fournit
+      if (navigator.virtualKeyboard) navigator.virtualKeyboard.addEventListener('geometrychange', function () {
+        var prev = vkH; vkH = Math.round(navigator.virtualKeyboard.boundingRect.height || 0);
+        if (prev > 0 && vkH === 0 && focused) closeKb(); else fit();
+      });
+    } catch (e) {}
+    fit();
+  })();
 
   /* ---------- démarrage ---------- */
   try { var saved = localStorage.getItem('cad-name'); if (saved) $('name').value = saved; } catch (e) {}
