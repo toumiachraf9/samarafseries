@@ -10,15 +10,26 @@
 <script>
 (function () {
   var CLIENT_ID = 'bd08f8e0767b43d3bfb9bc4f3b10be20';
+  // langue choisie dans l'appli (mémorisée sur l'appareil), français par défaut
+  var LANG = 'fr'; try { LANG = localStorage.getItem('a2g-lang') || 'fr'; } catch (e) {}
+  var T = {
+    fr: { incomplete: 'Connexion incomplète. Reviens à l\u2019appli et réessaie.', refused: 'Spotify a refusé la connexion', failed: 'La connexion à Spotify a échoué. Détail : ', connected: 'Connecté à Spotify', close: 'Tu peux fermer cette fenêtre et revenir à l\u2019appli.', back: 'Revenir à l\u2019appli', wait: 'Connexion à Spotify en cours…' },
+    en: { incomplete: 'Incomplete login. Go back to the app and try again.', refused: 'Spotify refused the login', failed: 'Spotify login failed. Detail: ', connected: 'Connected to Spotify', close: 'You can close this window and go back to the app.', back: 'Back to the app', wait: 'Connecting to Spotify…' },
+    ar: { incomplete: 'تسجيل الدخول غير مكتمل. ارجع إلى التطبيق وحاول مرة أخرى.', refused: 'رفض Spotify تسجيل الدخول', failed: 'فشل تسجيل الدخول إلى Spotify. التفاصيل: ', connected: 'متصل بـ Spotify', close: 'يمكنك إغلاق هذه النافذة والعودة إلى التطبيق.', back: 'العودة إلى التطبيق', wait: 'جارٍ الاتصال بـ Spotify…' }
+  };
+  var L = T[LANG] || T.fr;
+  if (LANG === 'ar') document.documentElement.dir = 'rtl';
+  document.documentElement.lang = T[LANG] ? LANG : 'fr';
   var msg = document.getElementById('msg');
+  msg.textContent = L.wait;
   function fail(text) { msg.textContent = text; }
   function done(name) {
     try { localStorage.setItem('a2g-spotify', JSON.stringify({ name: name || 'Spotify' })); } catch (e) {}
     try { localStorage.removeItem('a2g-spot-verifier'); } catch (e) {}
     try { window.close(); } catch (e) {}
-    msg.textContent = 'Connecté à Spotify' + (name ? ' : ' + name : '') + '. Tu peux fermer cette fenêtre et revenir à l\u2019appli.';
+    msg.textContent = L.connected + (name ? ' : ' + name : '') + '. ' + L.close;
     var a = document.createElement('a');
-    a.href = new URL('./', location.href).href; a.textContent = 'Revenir à l\u2019appli';
+    a.href = new URL('./', location.href).href; a.textContent = L.back;
     a.style.color = '#53fc18'; a.style.display = 'inline-block'; a.style.marginTop = '12px';
     msg.appendChild(document.createElement('br')); msg.appendChild(a);
   }
@@ -31,10 +42,10 @@
   }
   var params = new URLSearchParams(location.search);
   var code = params.get('code'), err = params.get('error');
-  if (err) return fail('Spotify a refusé la connexion (' + err + ').');
+  if (err) return fail(L.refused + ' (' + err + ').');
   var verifier = null;
   try { verifier = localStorage.getItem('a2g-spot-verifier'); } catch (e) {}
-  if (!code || !verifier) return fail('Connexion incomplète. Reviens à l\u2019appli et réessaie.');
+  if (!code || !verifier) return fail(L.incomplete);
   var redirect = new URL('spotify-callback', location.href).href;
   fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
@@ -43,16 +54,15 @@
   }).then(readJson).then(function (res) {
     if (!res.ok || !res.json || !res.json.access_token) {
       var d = res.json ? (res.json.error_description || res.json.error) : res.text;
-      throw new Error('jeton refusé (' + res.status + ') : ' + (d || 'réponse vide'));
+      throw new Error('(' + res.status + ') ' + (d || '—'));
     }
     try { localStorage.removeItem('a2g-spot-verifier'); } catch (e) {}
-    // la connexion est réussie : le nom est facultatif
     return fetch('https://api.spotify.com/v1/me', { headers: { Authorization: 'Bearer ' + res.json.access_token } })
       .then(readJson)
       .then(function (me) { done(me.ok && me.json ? (me.json.display_name || me.json.id) : ''); },
             function () { done(''); });
   }).catch(function (e) {
-    fail('La connexion à Spotify a échoué. Détail : ' + (e && e.message ? e.message : e));
+    fail(L.failed + (e && e.message ? e.message : e));
   });
 })();
 </script>
