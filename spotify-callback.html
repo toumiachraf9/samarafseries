@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connexion Spotify</title>
+</head>
+<body style="font-family: system-ui, sans-serif; background: #12111a; color: #fff; margin: 0; padding: 28px 20px; line-height: 1.5;">
+<p id="msg">Connexion à Spotify en cours…</p>
+<script>
+(function () {
+  var CLIENT_ID = 'bd08f8e0767b43d3bfb9bc4f3b10be20';
+  var msg = document.getElementById('msg');
+  function fail(text) { msg.textContent = text; }
+  function done() {
+    if (window.opener) { window.close(); return; }          // popup : on la ferme, la page principale se met à jour
+    location.replace(new URL('./', location.href).href);     // pas de popup : retour à la salle
+  }
+  var params = new URLSearchParams(location.search);
+  var code = params.get('code'), err = params.get('error');
+  if (err) return fail('Spotify a refusé la connexion (' + err + ').');
+  var verifier = null;
+  try { verifier = localStorage.getItem('a2g-spot-verifier'); } catch (e) {}
+  if (!code || !verifier) return fail('Connexion incomplète. Reviens à l\u2019appli et réessaie.');
+  var redirect = new URL('spotify-callback.html', location.href).href;
+  fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: CLIENT_ID, grant_type: 'authorization_code', code: code, redirect_uri: redirect, code_verifier: verifier })
+  }).then(function (r) { return r.json(); }).then(function (t) {
+    if (!t.access_token) throw new Error('token');
+    return fetch('https://api.spotify.com/v1/me', { headers: { Authorization: 'Bearer ' + t.access_token } })
+      .then(function (r) { return r.json(); })
+      .then(function (me) {
+        localStorage.setItem('a2g-spotify', JSON.stringify({ name: me.display_name || me.id || 'Spotify' }));
+        try { localStorage.removeItem('a2g-spot-verifier'); } catch (e) {}
+        done();
+      });
+  }).catch(function () {
+    try { localStorage.removeItem('a2g-spot-verifier'); } catch (e) {}
+    fail('La connexion à Spotify a échoué. Ferme cette fenêtre et réessaie.');
+  });
+})();
+</script>
+</body>
+</html>
