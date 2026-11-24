@@ -13,8 +13,12 @@
   var msg = document.getElementById('msg');
   function fail(text) { msg.textContent = text; }
   function done() {
-    if (window.opener) { window.close(); return; }          // popup : on la ferme, la page principale se met à jour
-    location.replace(new URL('./', location.href).href);     // pas de popup : retour à la salle
+    try { window.close(); } catch (e) {}                     // fermer la fenêtre de connexion
+    msg.textContent = 'Connecté à Spotify. Tu peux fermer cette fenêtre et revenir à l\u2019appli.';
+    var a = document.createElement('a');
+    a.href = new URL('./', location.href).href; a.textContent = 'Revenir à l\u2019appli';
+    a.style.color = '#53fc18'; a.style.display = 'inline-block'; a.style.marginTop = '12px';
+    msg.appendChild(document.createElement('br')); msg.appendChild(a);
   }
   var params = new URLSearchParams(location.search);
   var code = params.get('code'), err = params.get('error');
