@@ -2936,7 +2936,7 @@
     f.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
     f.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
     f.setAttribute('frameborder', '0');
-    $('yt').textContent = ''; $('yt').appendChild(f);
+    clearYtBox(); $('yt').appendChild(f);                  // on garde le panneau audio seul s'il est affiché
     yt.player = new YT.Player(f, {
       events: {
         onReady: function () { yt.pready = true; if (yt.active && gen === yt.gen) onYtLoaded(gen); },
@@ -2989,6 +2989,13 @@
     });
   }
   // ---------- YouTube audio seul : la vidéo reste chargée mais masquée, le son continue ----------
+  // vide la zone du lecteur sauf le panneau « audio seul »
+  function clearYtBox() {
+    var box = $('yt'); if (!box) return;
+    Array.prototype.slice.call(box.childNodes).forEach(function (n) {
+      if (!(n.nodeType === 1 && n.id === 'yt-audio-cover')) box.removeChild(n);
+    });
+  }
   function setAudioTitle(t) {
     var el = document.getElementById('yac-title'); if (el) el.textContent = t || '';
   }
