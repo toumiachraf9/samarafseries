@@ -4023,6 +4023,12 @@
     $('spot-who').textContent = 'Adresse envoyée à Spotify : ' + spotRedirect();   // pour vérifier qu'elle est identique à celle du tableau de bord
     var w = window.open(url, 'a2g-spotify', 'width=480,height=720');
     if (!w) location.href = url;                  // fenêtre bloquée : connexion dans cette page
+    var tries = 0;
+    var poll = setInterval(function () {                // on surveille le compte : dès qu'il est enregistré, on affiche « connecté »
+      tries++;
+      var st = null; try { st = localStorage.getItem('a2g-spotify'); } catch (e) {}
+      if (st || tries > 300) { clearInterval(poll); spotShowState(); }
+    }, 1000);
   }
   async function spotFinishLogin() {
     var params = new URLSearchParams(location.search);
