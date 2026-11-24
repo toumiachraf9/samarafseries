@@ -2128,7 +2128,7 @@
     $('drop-title').textContent = title;
     $('drop-text').textContent = text;
     $('btn-pick').hidden = !showPick;
-    $('btn-yt-drop').hidden = !showPick;
+    if ($('btn-yt-drop')) $('btn-yt-drop').hidden = !showPick;   // ce bouton a été retiré de la zone d'accueil
     $('prog').hidden = (progress === undefined);
     if (progress !== undefined) $('prog').value = progress;
   }
@@ -3385,7 +3385,7 @@
       return;
     }
     closeYtPanel(); $('yt-url').value = '';
-    startYT(p.id, p.start, true, null, audioOnly);
+    startYT(p.id, p.start, true, { playing: true, time: p.start || 0 }, audioOnly);   // « Lire » lance la lecture tout de suite
     broadcast({ t: 'yt', id: p.id, start: p.start, name: myName, audio: audioOnly });
     addMsg('', "Vidéo YouTube ouverte. Appuie sur lecture : tout le monde sera synchronisé.", 'sys');
   }
