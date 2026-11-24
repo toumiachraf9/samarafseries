@@ -424,10 +424,13 @@
   .srctile[hidden] { display: none !important; }
     #yt { position: relative; }
   #yt.yt-audio iframe, #yt.yt-audio > div:not(#yt-audio-cover) { position: absolute !important; left: -9999px !important; top: 0 !important; width: 320px !important; height: 180px !important; opacity: 0 !important; pointer-events: none !important; }
-  #yt-audio-cover { position: absolute; z-index: 5; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 20px; text-align: center; color: #fff; background: radial-gradient(circle at 50% 40%, #2d2b52 0%, #0d0c16 75%); }
-  .yac-ico { font-size: 56px; }
-  .yac-t { font-size: 18px; font-weight: 700; }
-  .yac-s { font-size: 13px; color: var(--muted); }
+  #yt-audio-cover { position: absolute; z-index: 5; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; background: radial-gradient(circle at 50% 35%, #2a2750 0%, #0c0b14 70%); }
+  .yac-card { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; color: #fff; }
+  .yac-ico { font-size: 44px; line-height: 1; }
+  .yac-t { font-size: 17px; font-weight: 700; letter-spacing: .2px; }
+  .yac-s { font-size: 13px; color: var(--muted); max-width: 320px; }
+  .yac-btn { margin-top: 8px; width: 68px; height: 68px; border-radius: 50%; border: 0; display: grid; place-items: center; cursor: pointer; color: #12111a; background: #5ed6c4; box-shadow: 0 8px 24px rgba(94, 214, 196, 0.35); transition: transform .15s ease; }
+  .yac-btn:active { transform: scale(.94); }
 </style>
 </head>
 <body>
@@ -2989,21 +2992,39 @@
     yt.audio = !!on;
     var box = $('yt'); if (!box) return;
     box.classList.toggle('yt-audio', !!on);
+    // le lecteur YouTube reste chargé et joue, mais il est sorti de l'écran (ses commandes ne s'affichent pas)
+    Array.prototype.forEach.call(box.querySelectorAll('iframe'), function (f) {
+      if (on) {
+        f.style.setProperty('position', 'absolute', 'important');
+        f.style.setProperty('left', '-9999px', 'important');
+        f.style.setProperty('top', '0', 'important');
+        f.style.setProperty('width', '320px', 'important');
+        f.style.setProperty('height', '180px', 'important');
+        f.style.setProperty('pointer-events', 'none', 'important');
+      } else {
+        ['position', 'left', 'top', 'width', 'height', 'pointer-events'].forEach(function (k) { f.style.removeProperty(k); });
+      }
+    });
     var cov = document.getElementById('yt-audio-cover');
     if (on && !cov) {
       cov = document.createElement('div'); cov.id = 'yt-audio-cover';
+      var card = document.createElement('div'); card.className = 'yac-card';
       var ico = document.createElement('div'); ico.className = 'yac-ico'; ico.textContent = '🎧';
       var t = document.createElement('div'); t.className = 'yac-t'; t.setAttribute('data-i18n', 'yt_audio_t'); t.textContent = tr('yt_audio_t');
       var sub = document.createElement('div'); sub.className = 'yac-s'; sub.setAttribute('data-i18n', 'yt_audio_s'); sub.textContent = tr('yt_audio_s');
-      var pb = document.createElement('button'); pb.type = 'button'; pb.className = 'btn primary'; pb.id = 'yt-audio-play';
-      pb.setAttribute('data-i18n', 'yt_audio_play'); pb.textContent = tr('yt_audio_play');
-      pb.addEventListener('click', function () {                 // le clic est fait par la personne : la lecture est autorisée
+      var pb = document.createElement('button'); pb.type = 'button'; pb.className = 'yac-btn'; pb.id = 'yt-audio-play';
+      pb.setAttribute('aria-label', 'Lecture / pause');
+      var PLAY = '<svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+      var PAUSE = '<svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+      pb.innerHTML = PLAY;
+      pb.addEventListener('click', function () {                 // clic de la personne : la lecture est autorisée
         if (!yt.player || !yt.pready) return;
         var st = null; try { st = yt.player.getPlayerState(); } catch (e) {}
-        if (st === 1) { try { yt.player.pauseVideo(); } catch (e) {} pb.setAttribute('data-i18n', 'yt_audio_play'); pb.textContent = tr('yt_audio_play'); }
-        else { try { yt.player.playVideo(); } catch (e) {} pb.setAttribute('data-i18n', 'yt_audio_pause'); pb.textContent = tr('yt_audio_pause'); }
+        if (st === 1) { try { yt.player.pauseVideo(); } catch (e) {} pb.innerHTML = PLAY; }
+        else { try { yt.player.playVideo(); } catch (e) {} pb.innerHTML = PAUSE; }
       });
-      cov.appendChild(ico); cov.appendChild(t); cov.appendChild(sub); cov.appendChild(pb);
+      card.appendChild(ico); card.appendChild(t); card.appendChild(sub); card.appendChild(pb);
+      cov.appendChild(card);
       box.appendChild(cov);
     } else if (!on && cov) cov.remove();
   }
