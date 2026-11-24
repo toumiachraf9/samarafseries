@@ -2996,6 +2996,20 @@
       if (!(n.nodeType === 1 && n.id === 'yt-audio-cover')) box.removeChild(n);
     });
   }
+  // la barre de commandes Plyr (lecteur des fichiers) se cache dès qu'une vidéo externe est affichée
+  function syncPlyr() {
+    var box = $('yt'); var ext = !!box && !box.hidden;
+    Array.prototype.forEach.call(document.querySelectorAll('.plyr'), function (pl) {
+      if (ext) {
+        if (pl.dataset.a2gPrev === undefined) pl.dataset.a2gPrev = pl.style.display || '';
+        pl.style.setProperty('display', 'none', 'important');
+      } else if (pl.dataset.a2gPrev !== undefined) {
+        pl.style.removeProperty('display');
+        if (pl.dataset.a2gPrev) pl.style.display = pl.dataset.a2gPrev;
+        delete pl.dataset.a2gPrev;
+      }
+    });
+  }
   function setAudioTitle(t) {
     var el = document.getElementById('yac-title'); if (el) el.textContent = t || '';
   }
@@ -3016,17 +3030,7 @@
         ['position', 'left', 'top', 'width', 'height', 'pointer-events'].forEach(function (k) { f.style.removeProperty(k); });
       }
     });
-    // la barre de commandes du lecteur Plyr (le lecteur de vidéos du site) reste cachée en mode audio seul
-    Array.prototype.forEach.call(document.querySelectorAll('.plyr'), function (pl) {
-      if (on) {
-        if (pl.dataset.a2gPrev === undefined) pl.dataset.a2gPrev = pl.style.display || '';
-        pl.style.setProperty('display', 'none', 'important');
-      } else if (pl.dataset.a2gPrev !== undefined) {
-        pl.style.removeProperty('display');
-        if (pl.dataset.a2gPrev) pl.style.display = pl.dataset.a2gPrev;
-        delete pl.dataset.a2gPrev;
-      }
-    });
+    syncPlyr();
     var cov = document.getElementById('yt-audio-cover');
     if (on && !cov) {
       cov = document.createElement('div'); cov.id = 'yt-audio-cover';
@@ -4142,6 +4146,8 @@
     spotShowState();
   }
   window.addEventListener('storage', function (e) { if (e.key === 'a2g-spotify') spotShowState(); });
+  if ($('yt')) { new MutationObserver(syncPlyr).observe($('yt'), { attributes: true, attributeFilter: ['hidden'] }); }
+  syncPlyr();
   var acctUser = null;
   var ACCT_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm0 2.25c-3.2 0-9.5 1.6-9.5 4.75V21h19v-2c0-3.15-6.3-4.75-9.5-4.75z"/></svg>';
   function hashId(uid) {
