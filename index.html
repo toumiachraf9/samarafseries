@@ -3990,7 +3990,7 @@
   // ---------- connexion au compte Spotify (PKCE, sans secret) ----------
   var SPOTIFY_CLIENT_ID = 'bd08f8e0767b43d3bfb9bc4f3b10be20';                       // ← colle ici l'identifiant de ton application Spotify
   var SPOTIFY_SCOPES = 'user-read-private user-read-email';
-  function spotRedirect() { return new URL('spotify-callback.html', location.href).href; }
+  function spotRedirect() { return new URL('spotify-callback', location.href).href; }   // sans « .html » : GitHub Pages perd ?code= en redirigeant .html
   function spotRand(n) {
     var a = new Uint8Array(n); crypto.getRandomValues(a);
     return Array.prototype.map.call(a, function (x) { return ('0' + (x % 36).toString(36)).slice(-1); }).join('');

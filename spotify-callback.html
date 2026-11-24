@@ -26,7 +26,7 @@
   var verifier = null;
   try { verifier = localStorage.getItem('a2g-spot-verifier'); } catch (e) {}
   if (!code || !verifier) return fail('Connexion incomplète. Reviens à l\u2019appli et réessaie.');
-  var redirect = new URL('spotify-callback.html', location.href).href;
+  var redirect = new URL('spotify-callback', location.href).href;   // même adresse que dans la page principale
   fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
