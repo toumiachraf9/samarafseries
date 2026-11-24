@@ -422,9 +422,7 @@
   .pincp.ok { color: var(--accent); border-color: var(--accent); }
   .spot-acct { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 10px; font-size: 13px; }
   .srctile[hidden] { display: none !important; }
-    #yt { position: relative; }
-  #yt.yt-audio { min-height: 360px; aspect-ratio: 16 / 9; max-height: 70vh; width: 100%; }
-  #yt.yt-audio iframe, #yt.yt-audio > div:not(#yt-audio-cover) { position: absolute !important; left: -9999px !important; top: 0 !important; width: 320px !important; height: 180px !important; opacity: 0 !important; pointer-events: none !important; }
+    #yt.yt-audio iframe, #yt.yt-audio > div:not(#yt-audio-cover) { position: absolute !important; left: -9999px !important; top: 0 !important; width: 320px !important; height: 180px !important; opacity: 0 !important; pointer-events: none !important; }
   #yt-audio-cover { position: absolute; z-index: 10; inset: 0; background: url("data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20800%20450%22%3E%3Cdefs%3E%3CradialGradient%20id%3D%22g%22%20cx%3D%2250%25%22%20cy%3D%2245%25%22%20r%3D%2260%25%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%232a2750%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230c0b14%22%2F%3E%3C%2FradialGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%22800%22%20height%3D%22450%22%20fill%3D%22url%28%23g%29%22%2F%3E%3Cg%20opacity%3D%220.35%22%20fill%3D%22none%22%20stroke%3D%22%235ed6c4%22%20stroke-width%3D%2222%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M250%20250%20A150%20150%200%200%201%20550%20250%22%2F%3E%3C%2Fg%3E%3Cg%20opacity%3D%220.35%22%20fill%3D%22%235ed6c4%22%3E%3Crect%20x%3D%22222%22%20y%3D%22236%22%20width%3D%2262%22%20height%3D%22120%22%20rx%3D%2226%22%2F%3E%3Crect%20x%3D%22516%22%20y%3D%22236%22%20width%3D%2262%22%20height%3D%22120%22%20rx%3D%2226%22%2F%3E%3C%2Fg%3E%3Cg%20opacity%3D%220.12%22%20fill%3D%22%235ed6c4%22%3E%3Ccircle%20cx%3D%22400%22%20cy%3D%22225%22%20r%3D%22260%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") center / cover no-repeat, #0c0b14; }
   .yac-top { position: absolute; top: 18px; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: 8px; color: #fff; }
   .yac-ico { font-size: 22px; line-height: 1; }
@@ -3013,7 +3011,14 @@
     });
     // la barre de commandes du lecteur Plyr (le lecteur de vidéos du site) reste cachée en mode audio seul
     Array.prototype.forEach.call(document.querySelectorAll('.plyr'), function (pl) {
-      if (on) pl.style.setProperty('display', 'none', 'important'); else pl.style.removeProperty('display');
+      if (on) {
+        if (pl.dataset.a2gPrev === undefined) pl.dataset.a2gPrev = pl.style.display || '';
+        pl.style.setProperty('display', 'none', 'important');
+      } else if (pl.dataset.a2gPrev !== undefined) {
+        pl.style.removeProperty('display');
+        if (pl.dataset.a2gPrev) pl.style.display = pl.dataset.a2gPrev;
+        delete pl.dataset.a2gPrev;
+      }
     });
     var cov = document.getElementById('yt-audio-cover');
     if (on && !cov) {
