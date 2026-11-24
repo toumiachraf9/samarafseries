@@ -12,13 +12,22 @@
   var CLIENT_ID = 'bd08f8e0767b43d3bfb9bc4f3b10be20';
   var msg = document.getElementById('msg');
   function fail(text) { msg.textContent = text; }
-  function done() {
-    try { window.close(); } catch (e) {}                     // fermer la fenêtre de connexion
-    msg.textContent = 'Connecté à Spotify. Tu peux fermer cette fenêtre et revenir à l\u2019appli.';
+  function done(name) {
+    try { localStorage.setItem('a2g-spotify', JSON.stringify({ name: name || 'Spotify' })); } catch (e) {}
+    try { localStorage.removeItem('a2g-spot-verifier'); } catch (e) {}
+    try { window.close(); } catch (e) {}
+    msg.textContent = 'Connecté à Spotify' + (name ? ' : ' + name : '') + '. Tu peux fermer cette fenêtre et revenir à l\u2019appli.';
     var a = document.createElement('a');
     a.href = new URL('./', location.href).href; a.textContent = 'Revenir à l\u2019appli';
     a.style.color = '#53fc18'; a.style.display = 'inline-block'; a.style.marginTop = '12px';
     msg.appendChild(document.createElement('br')); msg.appendChild(a);
+  }
+  // lit la réponse en texte puis la décode : évite l'erreur « not valid JSON » si Spotify renvoie du texte brut
+  function readJson(r) {
+    return r.text().then(function (txt) {
+      var j = null; try { j = JSON.parse(txt); } catch (e) {}
+      return { ok: r.ok, status: r.status, json: j, text: txt };
+    });
   }
   var params = new URLSearchParams(location.search);
   var code = params.get('code'), err = params.get('error');
@@ -26,23 +35,23 @@
   var verifier = null;
   try { verifier = localStorage.getItem('a2g-spot-verifier'); } catch (e) {}
   if (!code || !verifier) return fail('Connexion incomplète. Reviens à l\u2019appli et réessaie.');
-  var redirect = new URL('spotify-callback', location.href).href;   // même adresse que dans la page principale
+  var redirect = new URL('spotify-callback', location.href).href;
   fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ client_id: CLIENT_ID, grant_type: 'authorization_code', code: code, redirect_uri: redirect, code_verifier: verifier })
-  }).then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }); }).then(function (res) {
-    var t = res.body || {};
-    if (!t.access_token) throw new Error('Spotify (' + res.status + ') : ' + (t.error_description || t.error || 'pas de jeton'));
-    return fetch('https://api.spotify.com/v1/me', { headers: { Authorization: 'Bearer ' + t.access_token } })
-      .then(function (r) { return r.json(); })
-      .then(function (me) {
-        localStorage.setItem('a2g-spotify', JSON.stringify({ name: me.display_name || me.id || 'Spotify' }));
-        try { localStorage.removeItem('a2g-spot-verifier'); } catch (e) {}
-        done();
-      });
+  }).then(readJson).then(function (res) {
+    if (!res.ok || !res.json || !res.json.access_token) {
+      var d = res.json ? (res.json.error_description || res.json.error) : res.text;
+      throw new Error('jeton refusé (' + res.status + ') : ' + (d || 'réponse vide'));
+    }
+    try { localStorage.removeItem('a2g-spot-verifier'); } catch (e) {}
+    // la connexion est réussie : le nom est facultatif
+    return fetch('https://api.spotify.com/v1/me', { headers: { Authorization: 'Bearer ' + res.json.access_token } })
+      .then(readJson)
+      .then(function (me) { done(me.ok && me.json ? (me.json.display_name || me.json.id) : ''); },
+            function () { done(''); });
   }).catch(function (e) {
-    try { localStorage.removeItem('a2g-spot-verifier'); } catch (x) {}
     fail('La connexion à Spotify a échoué. Détail : ' + (e && e.message ? e.message : e));
   });
 })();
