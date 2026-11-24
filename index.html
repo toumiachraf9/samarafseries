@@ -2533,7 +2533,19 @@
 
   /* ---------- lecture locale et synchronisation ---------- */
   function resetVideo() {
+    // remise à zéro complète : chaque source part d'un écran propre (aucun reste d'une source précédente)
     if (typeof spot !== 'undefined' && spot.active) stopSpot(true);
+    if (typeof yt !== 'undefined' && yt.active) stopYT(true);
+    if (embedSrc) stopEmbed(true);
+    if (typeof applyAudioMode === 'function') applyAudioMode(false);
+    if (typeof screenStream !== 'undefined' && screenStream) {
+      endScreenTracks();
+      if (rtcBroadcaster) { try { rtcBroadcaster.stop(); } catch (e) {} rtcBroadcaster = null; }
+      holdScreen(false);
+      if (typeof updateScreenBtn === 'function') updateScreenBtn();
+    }
+    if (typeof clearYtBox === 'function') clearYtBox();
+    if (typeof syncPlyr === 'function') syncPlyr();
     applyingUntil = Date.now() + 3000;                                   // la pause qui suit est faite par l'appli, pas par la personne : on ne l'envoie pas aux autres
     hasVideo = false; pendingState = null; liveMode = false; layout.classList.remove('livemode');
     video.srcObject = null;
