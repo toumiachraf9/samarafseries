@@ -4020,6 +4020,7 @@
     try { localStorage.setItem('a2g-spot-verifier', verifier); } catch (e) {}
     var q = new URLSearchParams({ client_id: SPOTIFY_CLIENT_ID, response_type: 'code', redirect_uri: spotRedirect(), scope: SPOTIFY_SCOPES, code_challenge_method: 'S256', code_challenge: challenge });
     var url = 'https://accounts.spotify.com/authorize?' + q.toString();
+    $('spot-who').textContent = 'Adresse envoyée à Spotify : ' + spotRedirect();   // pour vérifier qu'elle est identique à celle du tableau de bord
     var w = window.open(url, 'a2g-spotify', 'width=480,height=720');
     if (!w) location.href = url;                  // fenêtre bloquée : connexion dans cette page
   }
