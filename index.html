@@ -466,6 +466,15 @@
   #multi-wrap .mpadv .mdot { left: 50%; }
   #multi-wrap #m-fit { border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.08); color: #fff; border-radius: 999px; padding: 5px 12px; font-size: 12px; line-height: 1.2; cursor: pointer; }
   #multi-wrap #m-panel { gap: 6px; padding: 10px 12px; }
+  #multi-wrap .mside { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px 6px; border-radius: 14px; background: rgba(13, 12, 22, 0.6); opacity: 0; pointer-events: none; transition: opacity .25s ease; }
+  #multi-wrap .mcell:hover .mside, #multi-wrap .mside.show { opacity: 1; pointer-events: auto; }
+  #multi-wrap .msbtn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(13, 12, 22, 0.7); color: #fff; display: grid; place-items: center; cursor: pointer; line-height: 0; }
+  #multi-wrap .msbtn.off { color: #ff8a8a; border-color: rgba(255, 138, 138, 0.5); }
+  #multi-wrap .mvolwrap { position: relative; width: 24px; height: 90px; }
+  #multi-wrap .mvol { position: absolute; width: 90px; left: -33px; top: 35px; transform: rotate(-90deg); margin: 0; }
+  #multi-wrap .mcellmute { position: absolute; top: 8px; right: 8px; z-index: 6; width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(13, 12, 22, 0.7); color: #fff; display: grid; place-items: center; cursor: pointer; line-height: 0; }
+  #multi-wrap .mcellmuteB { top: calc(50% + 8px); }
+  #multi-wrap .mcellmute.off { color: #ff8a8a; border-color: rgba(255, 138, 138, 0.5); }
   #multi-wrap .mzv { min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; color: #fff; }
   #multi-wrap #m-time { min-width: 86px; font-variant-numeric: tabular-nums; }
   .pf-grid .mico, .btn .mico { width: 18px; height: 18px; margin-inline-end: 6px; }
@@ -4216,7 +4225,7 @@
   if ($('yt')) { new MutationObserver(syncPlyr).observe($('yt'), { attributes: true, attributeFilter: ['hidden'] }); }
   syncPlyr();
   // ---------- Multi-vidéo (YouTube ou Twitch, les deux du même site) ----------
-  var multi = { active: false, kind: '', a: '', b: '', pa: null, pb: null, zoom: 1, ox: 0, oy: 0, timer: null, ready: 0, muted: false, playing: false, fill: false, quietUntil: 0, placePad: null, oyA: 0, oyB: 0, startMuted: false };
+  var multi = { active: false, kind: '', a: '', b: '', pa: null, pb: null, zoom: 1, ox: 0, oy: 0, timer: null, ready: 0, muted: false, playing: false, fill: false, quietUntil: 0, placePad: null, oyA: 0, oyB: 0, startMuted: false, mutedA: false, mutedB: false };
   var M_PLAY = '<svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
   var M_PAUSE = '<svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
   var M_VOL = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>';
@@ -4265,11 +4274,17 @@
     $('tap').hidden = true; $('drop').hidden = true; $('yt').hidden = false;
     var box = $('yt');
     var wrap = document.createElement('div'); wrap.id = 'multi-wrap';
-    wrap.innerHTML = '<div class="mcell" id="mcellA"><div id="mpA"></div></div>' +
-      '<div class="mcell" id="mcellB"><div id="mpB"></div></div>' +
+    var side = function (k) {
+      return '<div class="mside" id="ms' + k + '">' +
+        '<button type="button" class="msbtn" id="m-mute' + k + '" aria-label="Couper le son">' + M_VOL + '</button>' +
+        '<button type="button" class="msbtn" id="m-play' + k + '" aria-label="Lecture / pause">' + M_PLAY + '</button>' +
+        '<div class="mvolwrap"><input type="range" class="mvol" id="m-vol' + k + '" min="0" max="100" value="100" aria-label="Volume de cette vidéo"></div>' +
+      '</div>';
+    };
+    wrap.innerHTML = '<div class="mcell" id="mcellA"><div id="mpA"></div>' + side('A') + '</div>' +
+      '<div class="mcell" id="mcellB"><div id="mpB"></div>' + side('B') + '</div>' +
       '<div id="m-panel">' +
         '<div class="mrow"><span id="m-time">0:00 / 0:00</span><input type="range" id="m-seek" min="0" max="1000" value="0" aria-label="Position"></div>' +
-        '<div class="mrow"><button type="button" class="mbtn" id="m-mute" aria-label="Muet">' + M_VOL + '</button><input type="range" id="m-vol" min="0" max="100" value="100" aria-label="Volume"></div>' +
         '<div class="mrow"><span class="mlab">Zoom</span><input type="range" id="m-zoom" min="0" max="100" step="1" value="100" aria-label="Zoom"><span id="m-zoomv" class="mzv">2.0x</span></div>' +
         '<div class="mrow"><button type="button" class="mbtn" id="m-fit"></button></div>' +
         '<div class="mrow mpadrow">' +
@@ -4321,17 +4336,47 @@
     $('m-seek').addEventListener('change', function () {
       var d = mDur(); if (d > 0) mCtl('seek', (this.value / 1000) * d);
     });
-    $('m-vol').addEventListener('input', function () { mCtl('vol', +this.value); });
+
     $('m-fit').addEventListener('click', function () {
       multi.fill = !multi.fill; updateFitBtn(); mFit();
     });
     updateFitBtn();
-    $('m-mute').addEventListener('click', function () { mCtl('mute', !multi.muted); });
+    ['A', 'B'].forEach(function (k) {
+      $('m-mute' + k).addEventListener('click', function () { mSetLocalMute(k, !multi['muted' + k]); });
+      // lecture / pause : partagé, comme la pause de l'une qui arrête les deux
+      $('m-play' + k).addEventListener('click', function () { mCtl(mIsPlaying() ? 'pause' : 'play'); });
+      // volume : propre à cette vidéo et à cette personne
+      $('m-vol' + k).addEventListener('input', function () { mSetLocalVol(k, +this.value); });
+      // sur écran tactile, les contrôles s'affichent quelques secondes au toucher
+      $('mcell' + k).addEventListener('pointerdown', function () {
+        var m = $('ms' + k); m.classList.add('show');
+        clearTimeout(m._hide); m._hide = setTimeout(function () { m.classList.remove('show'); }, 2500);
+      });
+    });
     $('m-zoom').addEventListener('input', function () { mSetZoom(zoomOf(+this.value)); });
     wirePads();
     mSetZoom(multi.zoom);
   }
   function mIsPlaying() { return !!multi.playing; }
+  // muet propre à chaque vidéo et à chaque personne : rien n'est envoyé à l'autre
+  function mSetLocalMute(k, on) {
+    multi['muted' + k] = !!on;
+    var p = k === 'A' ? multi.pa : multi.pb;
+    try {
+      if (multi.kind === 'twitch') p.setMuted(!!on);
+      else if (on) p.mute(); else p.unMute();
+    } catch (e) {}
+    var b = $('m-mute' + k);
+    if (b) {
+      b.classList.toggle('off', !!on);
+      b.innerHTML = on ? '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>' : M_VOL;
+    }
+  }
+  function mSetLocalVol(k, v) {
+    var p = k === 'A' ? multi.pa : multi.pb;
+    try { if (multi.kind === 'twitch') p.setVolume(v / 100); else p.setVolume(v); } catch (e) {}
+  }
+  function mApplyLocalMute() { mSetLocalMute('A', multi.mutedA); mSetLocalMute('B', multi.mutedB); }
   function updateFitBtn() {
     var b = $('m-fit'); if (!b) return;
     b.textContent = tr(multi.fill ? 'multi_fit_fill' : 'multi_fit_all');
@@ -4410,7 +4455,7 @@
     };
     if (!isPlaying(multi.pa) || !isPlaying(multi.pb)) { both = false; if (tries < 3) mDo('play'); }
     // au démarrage les vidéos sont en muet ; dès qu'elles jouent (ou à la dernière tentative), on rétablit le son
-    if (multi.startMuted && (both || tries >= 3)) { multi.startMuted = false; mDo('mute', false); }
+    if (multi.startMuted && (both || tries >= 3)) { multi.startMuted = false; mApplyLocalMute(); }
     if (!both && tries < 3) setTimeout(function () { mEnsurePlaying(tries + 1); }, 1500);
     else if (!both) addMsg('', tr('multi_manual'), 'sys');
   }
@@ -4437,6 +4482,7 @@
       var cur = 0, dur = 0;
       try { cur = multi.kind === 'twitch' ? multi.pa.getCurrentTime() : multi.pa.getCurrentTime(); dur = mDur(); } catch (e) {}
       if ($('m-time')) $('m-time').textContent = dur > 0 ? mFmt(cur) + ' / ' + mFmt(dur) : 'Direct';
+      ['A', 'B'].forEach(function (k) { var b = $('m-play' + k); if (b) b.innerHTML = mIsPlaying() ? M_PAUSE : M_PLAY; });
       if ($('m-seek')) {
         $('m-seek').disabled = !(dur > 0);                     // en direct : pas de position à régler
         if (dur > 0 && document.activeElement !== $('m-seek')) $('m-seek').value = Math.round(cur / dur * 1000);
