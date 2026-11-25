@@ -460,6 +460,12 @@
   #multi-wrap .mpad { position: relative; width: 120px; height: 120px; border-radius: 10px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.2); touch-action: none; cursor: grab; }
   #multi-wrap .mpad:active { cursor: grabbing; }
   #multi-wrap .mdot { position: absolute; width: 16px; height: 16px; border-radius: 50%; background: #5ed6c4; transform: translate(-50%, -50%); pointer-events: none; }
+  #multi-wrap .mpadrow { justify-content: flex-start; gap: 18px; }
+  #multi-wrap .mpadcol { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  #multi-wrap .mpadv { position: relative; width: 48px; height: 96px; border-radius: 10px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.2); touch-action: none; cursor: ns-resize; }
+  #multi-wrap .mpadv .mdot { left: 50%; }
+  #multi-wrap #m-fit { border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.08); color: #fff; border-radius: 999px; padding: 5px 12px; font-size: 12px; line-height: 1.2; cursor: pointer; }
+  #multi-wrap #m-panel { gap: 6px; padding: 10px 12px; }
   #multi-wrap .mzv { min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; color: #fff; }
   #multi-wrap #m-time { min-width: 86px; font-variant-numeric: tabular-nums; }
   .pf-grid .mico, .btn .mico { width: 18px; height: 18px; margin-inline-end: 6px; }
@@ -4266,8 +4272,10 @@
         '<div class="mrow"><button type="button" class="mbtn" id="m-mute" aria-label="Muet">' + M_VOL + '</button><input type="range" id="m-vol" min="0" max="100" value="100" aria-label="Volume"></div>' +
         '<div class="mrow"><span class="mlab">Zoom</span><input type="range" id="m-zoom" min="0" max="100" step="1" value="100" aria-label="Zoom"><span id="m-zoomv" class="mzv">2.0x</span></div>' +
         '<div class="mrow"><button type="button" class="mbtn" id="m-fit"></button></div>' +
-        '<div class="mrow mpadrow"><span class="mlab">Haut</span><div id="m-padA" class="mpadv" aria-label="Balayer la vidéo du haut"><span class="mdot"></span></div>' +
-        '<span class="mlab">Bas</span><div id="m-padB" class="mpadv" aria-label="Balayer la vidéo du bas"><span class="mdot"></span></div></div>' +
+        '<div class="mrow mpadrow">' +
+          '<div class="mpadcol"><span class="mlab">Haut</span><div id="m-padA" class="mpadv" aria-label="Balayer la vidéo du haut"><span class="mdot"></span></div></div>' +
+          '<div class="mpadcol"><span class="mlab">Bas</span><div id="m-padB" class="mpadv" aria-label="Balayer la vidéo du bas"><span class="mdot"></span></div></div>' +
+        '</div>' +
       '</div>' +
       '<div id="multi-bar"><button type="button" class="mbtn" id="m-toggle" aria-label="Afficher les réglages"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>';
     box.appendChild(wrap);
