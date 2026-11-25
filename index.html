@@ -457,6 +457,9 @@
   #multi-wrap .mrow { display: flex; align-items: center; gap: 10px; }
   #multi-wrap .mrow input[type=range] { flex: 1 1 auto; min-width: 0; }
   #multi-wrap .mlab { width: 46px; color: rgba(255, 255, 255, 0.7); }
+  #multi-wrap .mpad { position: relative; width: 120px; height: 120px; border-radius: 10px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.2); touch-action: none; cursor: grab; }
+  #multi-wrap .mpad:active { cursor: grabbing; }
+  #multi-wrap .mdot { position: absolute; width: 16px; height: 16px; border-radius: 50%; background: #5ed6c4; transform: translate(-50%, -50%); pointer-events: none; }
   #multi-wrap .mzv { min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; color: #fff; }
   #multi-wrap #m-time { min-width: 86px; font-variant-numeric: tabular-nums; }
   .pf-grid .mico, .btn .mico { width: 18px; height: 18px; margin-inline-end: 6px; }
@@ -2382,8 +2385,6 @@
       case 'spotctl': if (isHost) hostSpotCtl(d); break;
       case 'multi': startMulti(d.a, d.b, false); break;
       case 'mctl': if (multi.active) mDo(d.act, d.arg); break;
-      case 'mcrop': if (multi.active) mSetCrop(d.z, d.x, d.y, false); break;
-      case 'mfit': if (multi.active) { multi.fill = !!d.fill; updateFitBtn(); mFit(); } break;
       case 'spotstop': if (!isHost && spot.active) stopSpot(false); break;
       case 'yths': onYtHeartbeat(d); break;
       case 'theme': case 'wpneed': case 'wpchunk': if (window.__theme) window.__theme.receive(d, c.peerName); break;
@@ -4209,7 +4210,7 @@
   if ($('yt')) { new MutationObserver(syncPlyr).observe($('yt'), { attributes: true, attributeFilter: ['hidden'] }); }
   syncPlyr();
   // ---------- Multi-vidéo (YouTube ou Twitch, les deux du même site) ----------
-  var multi = { active: false, kind: '', a: '', b: '', pa: null, pb: null, zoom: 1, ox: 0, oy: 0, timer: null, ready: 0, muted: false, playing: false, fill: false, quietUntil: 0 };
+  var multi = { active: false, kind: '', a: '', b: '', pa: null, pb: null, zoom: 1, ox: 0, oy: 0, timer: null, ready: 0, muted: false, playing: false, fill: false, quietUntil: 0, placePad: null };
   var M_PLAY = '<svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
   var M_PAUSE = '<svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
   var M_VOL = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>';
@@ -4263,14 +4264,14 @@
       '<div id="m-panel">' +
         '<div class="mrow"><span id="m-time">0:00 / 0:00</span><input type="range" id="m-seek" min="0" max="1000" value="0" aria-label="Position"></div>' +
         '<div class="mrow"><button type="button" class="mbtn" id="m-mute" aria-label="Muet">' + M_VOL + '</button><input type="range" id="m-vol" min="0" max="100" value="100" aria-label="Volume"></div>' +
-        '<div class="mrow"><span class="mlab">Zoom</span><input type="range" id="m-zoom" min="0" max="100" step="1" value="50" aria-label="Zoom"><span id="m-zoomv" class="mzv">1.0x</span></div>' +
+        '<div class="mrow"><span class="mlab">Zoom</span><input type="range" id="m-zoom" min="0" max="100" step="1" value="100" aria-label="Zoom"><span id="m-zoomv" class="mzv">2.0x</span></div>' +
         '<div class="mrow"><button type="button" class="mbtn" id="m-fit"></button></div>' +
-        '<div class="mrow"><span class="mlab">&#8596;</span><input type="range" id="m-ox" min="-0.5" max="0.5" step="0.01" value="0" aria-label="Recadrage horizontal"></div>' +
-        '<div class="mrow"><span class="mlab">&#8597;</span><input type="range" id="m-oy" min="-0.5" max="0.5" step="0.01" value="0" aria-label="Recadrage vertical"></div>' +
+        '<div class="mrow"><span class="mlab">Balayer</span><div id="m-pad" class="mpad" aria-label="Balayer la vidéo (glisser)"><span class="mdot"></span></div></div>' +
       '</div>' +
       '<div id="multi-bar"><button type="button" class="mbtn" id="m-toggle" aria-label="Afficher les réglages"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>';
     box.appendChild(wrap);
-    multi.active = true; multi.kind = pa.kind; multi.a = a; multi.b = b; multi.ready = 0; multi.zoom = 1; multi.ox = 0; multi.oy = 0; multi.muted = false;
+    multi.active = true; multi.kind = pa.kind; multi.a = a; multi.b = b; multi.ready = 0; multi.zoom = 2; multi.ox = 0; multi.oy = 0; multi.muted = false;
+    multi.quietUntil = Date.now() + 4000;          // au démarrage, les lecteurs signalent des états provisoires : on ne les relaie pas
     if (asSource) broadcast({ t: 'multi', a: a, b: b });
     wireMultiBar();
     if (pa.kind === 'youtube') {
@@ -4313,13 +4314,12 @@
     $('m-vol').addEventListener('input', function () { mCtl('vol', +this.value); });
     $('m-fit').addEventListener('click', function () {
       multi.fill = !multi.fill; updateFitBtn(); mFit();
-      broadcast({ t: 'mfit', fill: multi.fill });
     });
     updateFitBtn();
     $('m-mute').addEventListener('click', function () { mCtl('mute', !multi.muted); });
-    ['m-zoom', 'm-ox', 'm-oy'].forEach(function (id) {
-      $(id).addEventListener('input', function () { mSetCrop(zoomOf(+$('m-zoom').value), +$('m-ox').value, +$('m-oy').value, true); });
-    });
+    $('m-zoom').addEventListener('input', function () { mSetCrop(zoomOf(+this.value), multi.ox, multi.oy, true); });
+    wirePad();
+    mSetCrop(multi.zoom, multi.ox, multi.oy, false);
   }
   function mIsPlaying() { return !!multi.playing; }
   function updateFitBtn() {
@@ -4363,12 +4363,29 @@
   // curseur : 50 = 1x (au milieu), vers la gauche = zoom arrière (0,5x), vers la droite = zoom avant (2x)
   function zoomOf(v) { return Math.pow(2, (v - 50) / 50); }
   function sliderOf(z) { return 50 + 50 * Math.log(z) / Math.LN2; }
-  function mSetCrop(z, x, y, send) {
+  // réglage propre à chaque personne : il n'est pas envoyé à l'autre
+  function mSetCrop(z, x, y) {
     multi.zoom = z; multi.ox = x; multi.oy = y;
-    if ($('m-zoom')) { $('m-zoom').value = sliderOf(z); $('m-ox').value = x; $('m-oy').value = y; }
+    if ($('m-zoom')) $('m-zoom').value = sliderOf(z);
     if ($('m-zoomv')) $('m-zoomv').textContent = z.toFixed(1) + 'x';
+    if (multi.placePad) multi.placePad();
     mFit();
-    if (send) broadcast({ t: 'mcrop', z: z, x: x, y: y });
+  }
+  // balayage : glisser dans la petite case du panneau pour déplacer la vidéo
+  function wirePad() {
+    var pad = $('m-pad'); if (!pad) return;
+    var dot = pad.querySelector('.mdot'), drag = false;
+    multi.placePad = function () { dot.style.left = ((multi.ox + 0.5) * 100) + '%'; dot.style.top = ((multi.oy + 0.5) * 100) + '%'; };
+    var set = function (e) {
+      var r = pad.getBoundingClientRect();
+      var x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+      var y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+      mSetCrop(multi.zoom, x - 0.5, y - 0.5);
+    };
+    pad.addEventListener('pointerdown', function (e) { drag = true; try { pad.setPointerCapture(e.pointerId); } catch (x) {} set(e); });
+    pad.addEventListener('pointermove', function (e) { if (drag) set(e); });
+    pad.addEventListener('pointerup', function () { drag = false; });
+    pad.addEventListener('dblclick', function () { mSetCrop(multi.zoom, 0, 0); });
   }
   function mFit() {
     ['A', 'B'].forEach(function (k) {
