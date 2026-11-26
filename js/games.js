@@ -1,9 +1,10 @@
-// Page des jeux (games.html) : elle affiche la partie et envoie les actions à la page principale,
-// qui garde la connexion et valide chaque coup.
 function $(id) { return document.getElementById(id); }
-var STATE = { g: null, me: '', name: '', host: false };
-function act(a) { parent.postMessage({ src: 'games', act: a }, location.origin); }
+var STATE = { g: null, me: '', host: false };
+var GAME_ACT = function () {};
+function act(a) { GAME_ACT(a); }
+function $(id) { return document.getElementById(id); }
   var GAME_NAMES = { ttt: 'Morpion', rps: 'Pierre-feuille-ciseaux', c4: 'Puissance 4', wordle: 'Mot mystère', quiz: 'Quiz' };
+  var GAME_DESC = { ttt: 'Aligne 3 symboles', rps: 'Pierre, feuille, ciseaux à deux', c4: 'Aligne 4 jetons à deux', wordle: 'Trouve le mot de 5 lettres', quiz: 'Questions et score' };
   var GAME_TWO = { ttt: 1, rps: 1, c4: 1 };
   var RPS_CH = ['Pierre', 'Feuille', 'Ciseaux'];
   var QUIZ = [
@@ -177,12 +178,13 @@ function act(a) { parent.postMessage({ src: 'games', act: a }, location.origin);
   function renderGame() {
     var body = $('gbody'), title = $('gtitle'); if (!body) return;
     body.textContent = '';
-    if (!STATE.g) {
+      if (!STATE.g) {
       title.textContent = 'Jeux';
       body.appendChild(gEl('p', 'gmsg', 'Choisis un jeu à jouer ensemble. Une seule partie à la fois.'));
       var menu = gEl('div', 'menu');
       Object.keys(GAME_NAMES).forEach(function (k, i) {
-        var mb = gEl('button', 'mcard g' + i, GAME_NAMES[k]); mb.type = 'button';
+        var mb = gEl('button', 'mcard'); mb.type = 'button';
+        mb.appendChild(gEl('span', 'mname', GAME_NAMES[k])); mb.appendChild(gEl('span', 'mdesc', GAME_DESC[k]));
         mb.addEventListener('click', function () { act({ a: 'open', type: k }); });
         menu.appendChild(mb);
       });
@@ -203,13 +205,14 @@ function act(a) { parent.postMessage({ src: 'games', act: a }, location.origin);
     body.appendChild(row);
   }
 
-window.addEventListener('message', function (e) {
-  if (e.source !== parent || e.origin !== location.origin) return;
-  var d = e.data || {};
-  if (d.src !== 'parent') return;
-  if (d.init) { STATE.me = d.init.me; STATE.name = d.init.name; STATE.host = !!d.init.host; }
-  STATE.g = d.g || null;
-  renderGame();
+// appelé par la salle : affiche la partie en cours et envoie les actions à la salle
+window.GameUI = {
+  show: function (game, me, host, actFn) {
+    STATE.g = game || null; STATE.me = me; STATE.host = !!host; GAME_ACT = actFn;
+    renderGame();
+  }
+};
+// fermer : la salle ferme la fenêtre ; la partie terminée est retirée pour que la liste des jeux revienne
+$('g-close').addEventListener('click', function () {
+  if (window.parent && window.parent.closeGamesFromFrame) window.parent.closeGamesFromFrame();
 });
-$('g-close').addEventListener('click', function () { parent.postMessage({ src: 'games', close: true }, location.origin); });
-parent.postMessage({ src: 'games', ready: true }, location.origin);

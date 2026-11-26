@@ -979,23 +979,29 @@
   function gScoreText(g) {
     return Object.keys(g.pn || {}).map(function (k) { return g.pn[k] + ' : ' + (g.scores[k] || 0); }).join(' · ');
   }
-  // ---------- jeux : la page des jeux (games.html) s'affiche dans un cadre ; l'hôte garde la partie ----------
+  // ---------- jeux : affichés par-dessus la salle ; l'hôte garde la partie et valide chaque coup ----------
   var seenInvite = null;
   function renderGame() {
-    var f = $('gframe');
-    if (f && f.contentWindow) f.contentWindow.postMessage({ src: 'parent', init: { me: myCid, name: myName, host: isHost }, g: GAME }, location.origin);
+    var fr = $('gframe');
+    if (fr && !fr.hidden && fr.contentWindow && fr.contentWindow.GameUI) fr.contentWindow.GameUI.show(GAME, myCid, isHost, gAction);
     updateInvite();
   }
   function updateInvite() {
-    var box = $('ginvite'); if (!box) return;
+    var card = $('ginvite'); if (!card) return;
     var g = GAME, show = false;
     if (g && g.invite && g.invite.cid !== myCid && seenInvite !== g.id && gPlayerIndex(g, myCid) < 0 &&
         (GAME_TWO[g.type] ? g.status === 'lobby' : g.status === 'play')) show = true;
-    box.hidden = !show;
+    card.hidden = !show;
     if (show) $('ginvite-text').textContent = g.invite.name + " t'invite à jouer : " + GAME_NAMES[g.type];
   }
   function openGames() { $('gframe').hidden = false; renderGame(); }
-  function closeGames() { $('gframe').hidden = true; }
+  function closeGames() {
+    // une partie terminée est retirée : la prochaine ouverture affiche la liste des jeux
+    if (GAME && GAME.status === 'over') gAction({ a: 'close' });
+    $('gframe').hidden = true;
+  }
+  window.closeGamesFromFrame = closeGames;
+  $('gframe').addEventListener('load', renderGame);
   function acceptInvite() {
     var g = GAME; if (!g) return;
     seenInvite = g.id; openGames();
@@ -1003,14 +1009,6 @@
     updateInvite();
   }
   function declineInvite() { if (GAME) seenInvite = GAME.id; updateInvite(); }
-  window.addEventListener('message', function (e) {
-    var f = $('gframe'); if (!f || e.source !== f.contentWindow || e.origin !== location.origin) return;
-    var d = e.data || {};
-    if (d.src !== 'games') return;
-    if (d.ready) renderGame();
-    if (d.act) gAction(d.act);
-    if (d.close) closeGames();
-  });
   $('btn-games').addEventListener('click', function () { if ($('gframe').hidden) openGames(); else closeGames(); });
   $('ginvite-yes').addEventListener('click', acceptInvite);
   $('ginvite-no').addEventListener('click', declineInvite);
