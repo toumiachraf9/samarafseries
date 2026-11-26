@@ -1,7 +1,25 @@
 function $(id) { return document.getElementById(id); }
 var STATE = { g: null, me: '', host: false };
 var GAME_ACT = function () {};
-function act(a) { GAME_ACT(a); }
+// une action (choix, réponse, arrivée) est renvoyée tant que la salle ne l'a pas confirmée
+var PENDING = null, PENDING_TRIES = 0, PENDING_T = null;
+function pendingDone(a) {
+  var g = STATE.g; if (!g) return true;
+  if (a.a === 'pick') return !!(g.picked && g.picked[STATE.me]) || !!g.result;
+  if (a.a === 'join') return g.status !== 'lobby' || (g.players || []).some(function (p) { return p.cid === STATE.me; });
+  if (a.a === 'answer') return !!(g.answers && g.answers[STATE.me] !== undefined) || !!g.revealed;
+  if (a.a === 'move' && g.type === 'ttt') return !!g.board[a.i];
+  return true;
+}
+function act(a) {
+  GAME_ACT(a);
+  if (['pick', 'join', 'answer', 'move'].indexOf(a.a) < 0) return;
+  PENDING = a; PENDING_TRIES = 0; clearInterval(PENDING_T);
+  PENDING_T = setInterval(function () {
+    if (!PENDING || pendingDone(PENDING) || ++PENDING_TRIES > 5) { clearInterval(PENDING_T); PENDING = null; return; }
+    GAME_ACT(PENDING);
+  }, 1200);
+}
 function $(id) { return document.getElementById(id); }
   var GAME_NAMES = { ttt: 'Morpion', rps: 'Pierre-feuille-ciseaux', c4: 'Puissance 4', wordle: 'Mot mystère', quiz: 'Quiz' };
   var GAME_DESC = { ttt: 'Aligne 3 symboles', rps: 'Pierre, feuille, ciseaux à deux', c4: 'Aligne 4 jetons à deux', wordle: 'Trouve le mot de 5 lettres', quiz: 'Questions et score' };
@@ -206,8 +224,10 @@ function $(id) { return document.getElementById(id); }
   }
 
 // appelé par la salle : affiche la partie en cours et envoie les actions à la salle
+var SHOWN = false;
 window.GameUI = {
   show: function (game, me, host, actFn) {
+    SHOWN = true;
     STATE.g = game || null; STATE.me = me; STATE.host = !!host; GAME_ACT = actFn;
     renderGame();
   }
@@ -216,3 +236,13 @@ window.GameUI = {
 $('g-close').addEventListener('click', function () {
   if (window.parent && window.parent.closeGamesFromFrame) window.parent.closeGamesFromFrame();
 });
+// message clair si la page n'est pas reliée à la salle (ouverte depuis un fichier sur l'ordinateur, par exemple)
+function gNoLink() {
+  if (SHOWN) return;
+  var body = $('gbody'); if (!body) return;
+  body.textContent = '';
+  body.appendChild(gEl('p', 'gmsg', location.protocol === 'file:'
+    ? 'Les jeux ne marchent pas depuis un fichier sur ton ordinateur. Ouvre le site en ligne (https) et touche Jeux.'
+    : 'Connexion à la salle en cours… Touche Jeux depuis la salle si rien n\'apparaît.'));
+}
+setTimeout(gNoLink, 1500);

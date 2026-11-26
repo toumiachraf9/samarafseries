@@ -980,7 +980,7 @@
     return Object.keys(g.pn || {}).map(function (k) { return g.pn[k] + ' : ' + (g.scores[k] || 0); }).join(' · ');
   }
   // ---------- jeux : affichés par-dessus la salle ; l'hôte garde la partie et valide chaque coup ----------
-  var seenInvite = null;
+  var seenInvite = null, lastGameJson = '';
   function renderGame() {
     var fr = $('gframe');
     if (fr && !fr.hidden && fr.contentWindow && fr.contentWindow.GameUI) fr.contentWindow.GameUI.show(GAME, myCid, isHost, gAction);
@@ -1203,6 +1203,7 @@
     if (!isHost || !peer || !openConns().length) return;
     updateStatus();
     broadcast({ t: 'count', n: roomCount, names: memberNames() });
+      if (isHost && GAME) broadcast({ t: 'gstate', g: GAME });   // la salle renvoie l'état : aucun ami ne reste bloqué
   }, 3000);
   function setDrop(title, text, showPick, progress) {
     $('drop').hidden = false;
@@ -1344,7 +1345,12 @@
       case 'count': if (!isHost) { roomCount = +d.n || 0; roomNames = Array.isArray(d.names) ? d.names.map(function (x) { return String(x).slice(0, 20); }) : []; updateStatus(); } break;
       case 'ready': if (isHost) c.ready = !!d.ok; break;
       case 'gstate':
-        if (!isHost) { var wasGame = GAME; GAME = d.g || null; if (GAME && !wasGame) showToast('Jeux', 'Une partie vient de commencer'); renderGame(); }
+        if (!isHost) {
+          var gj = JSON.stringify(d.g || null);
+          if (gj === lastGameJson) break;              // rien de nouveau : on ne redessine pas (la saisie reste)
+          lastGameJson = gj;
+          var wasGame = GAME; GAME = d.g || null; if (GAME && !wasGame) showToast('Jeux', 'Une partie vient de commencer'); renderGame();
+        }
         break;
       case 'gact':
         if (isHost) { gApply(d.act, String(d.cid || '').slice(0, 40), String(d.name || '').slice(0, 20)); gBroadcast(); }
