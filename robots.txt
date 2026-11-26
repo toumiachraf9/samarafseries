@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /spotify-callback.html
+
+Sitemap: https://toumiachraf9.github.io/samarafseries/sitemap.xml

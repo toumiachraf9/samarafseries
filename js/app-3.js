@@ -997,6 +997,12 @@
       if (!isHost && openConns().some(function (o) { return o !== c && !o.dead; })) { c.replaced = true; dropConn(c, true); return; }
       c.wasOpen = true;
       c.lastSeen = Date.now();
+      try {                                               // prévient si la liaison directe échoue (réseau bloqué)
+        var pcx = c.peerConnection;
+        if (pcx) pcx.addEventListener('iceconnectionstatechange', function () {
+          if (pcx.iceConnectionState === 'failed') sysOnce('ice-fail', "La connexion directe n'a pas pu s'établir. Si ça persiste, essayez depuis un autre réseau (Wi-Fi ou 4G).", 120000);
+        });
+      } catch (e) {}
       if (conns.indexOf(c) < 0) conns.push(c);
       if (!isHost) {
         joinedOnce = true;
@@ -1221,6 +1227,9 @@
   /* ---------- réseau : connexion ---------- */
   /* Serveurs de connexion (STUN + TURN) : le TURN relaie la vidéo quand la connexion directe échoue (4G, certaines box).
      Remplace les identifiants TURN par les tiens si tu en as (plus fiable que le service public de test). */
+  // Relais TURN : « openrelay » est un service public partagé, il peut être lent ou saturé.
+  // Pour une connexion plus fiable, ajoute ici tes propres identifiants TURN (compte gratuit chez un fournisseur TURN),
+  // puis garde openrelay en secours.
   var PEER_OPTS = {
     config: {
       iceServers: [
@@ -1236,7 +1245,25 @@
   // mêmes serveurs STUN/TURN pour la diffusion vidéo que pour la connexion PeerJS (indispensable sur 4G / Wi-Fi différents)
   RTCCore.CONFIG.iceServers = PEER_OPTS.config.iceServers;
 
-  function startPeer(id, onOpen) {
+  // Identifiants TURN temporaires fournis par ton Worker Cloudflare (voir le guide). Tant que l'adresse n'est pas remplie, rien ne change.
+  var TURN_URL = 'https://anything2gether.toumiachraf9.workers.dev';
+  var ICE_READY = (function () {
+    if (!TURN_URL || TURN_URL.indexOf('VOTRE-') !== -1) return Promise.resolve();
+    var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var tm = setTimeout(function () { if (ctrl) ctrl.abort(); }, 4000);
+    return fetch(TURN_URL, ctrl ? { signal: ctrl.signal } : {})
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        clearTimeout(tm);
+        if (!j || !j.iceServers || !j.iceServers.length) return;
+        PEER_OPTS.config.iceServers = j.iceServers.concat(PEER_OPTS.config.iceServers);
+        RTCCore.CONFIG.iceServers = PEER_OPTS.config.iceServers;
+      })
+      .catch(function () { clearTimeout(tm); });   // service indisponible : on garde les serveurs de secours
+  })();
+  // on ne crée la connexion qu'une fois les serveurs relais prêts
+  function startPeer(id, onOpen) { ICE_READY.then(function () { startPeerNow(id, onOpen); }); }
+  function startPeerNow(id, onOpen) {
     if (typeof Peer === 'undefined') {
       $('home-error').textContent = 'Impossible de charger la connexion directe. Vérifie ta connexion internet.';
       return;
@@ -1265,7 +1292,17 @@
         $('home-error').textContent = 'Connexion de ton ID ' + fmtId(roomId) + '…';
         setTimeout(function () { if (isHost && !$('home').hidden) openHost(); }, 2500);
       }
-      else { $('home-error').textContent = 'Erreur de connexion : ' + e.type; updateStatus(); }
+      else {
+        var MSG = {
+          'network': "Impossible de joindre le serveur de connexion. Vérifie ta connexion Internet.",
+          'server-error': "Le serveur de connexion ne répond pas. Réessaie dans un instant.",
+          'socket-error': "Le serveur de connexion ne répond pas. Réessaie dans un instant.",
+          'socket-closed': "Le serveur de connexion ne répond pas. Réessaie dans un instant.",
+          'browser-incompatible': "Ce navigateur ne permet pas la connexion. Essaie Chrome, Firefox ou Safari récent."
+        };
+        $('home-error').textContent = MSG[e.type] || ('Erreur de connexion : ' + e.type);
+        updateStatus();
+      }
     });
     peer.on('disconnected', function () { try { peer.reconnect(); } catch (e) {} });
   }
@@ -2949,25 +2986,6 @@
       var st = null; try { st = localStorage.getItem('a2g-spotify'); } catch (e) {}
       if (st || tries > 300) { clearInterval(poll); spotShowState(); }
     }, 1000);
-  }
-  async function spotFinishLogin() {
-    var params = new URLSearchParams(location.search);
-    var code = params.get('code'), verifier = null;
-    try { verifier = sessionStorage.getItem('a2g-spot-verifier'); } catch (e) {}
-    if (!code || !verifier || !SPOTIFY_CLIENT_ID) return;
-    try {
-      var r = await fetch('https://accounts.spotify.com/api/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ client_id: SPOTIFY_CLIENT_ID, grant_type: 'authorization_code', code: code, redirect_uri: spotRedirect(), code_verifier: verifier }) });
-      var t = await r.json();
-      if (!t.access_token) throw new Error('token');
-      var me = await fetch('https://api.spotify.com/v1/me', { headers: { Authorization: 'Bearer ' + t.access_token } }).then(function (x) { return x.json(); });
-      localStorage.setItem('a2g-spotify', JSON.stringify({ name: me.display_name || me.id || 'Spotify' }));
-    } catch (e) {
-      $('home-error').textContent = tr('sp_fail');
-    }
-    try { sessionStorage.removeItem('a2g-spot-verifier'); } catch (e) {}
-    history.replaceState(null, '', location.pathname);
-    spotShowState();
   }
   window.addEventListener('storage', function (e) { if (e.key === 'a2g-spotify') spotShowState(); });
   if ($('yt')) { new MutationObserver(syncPlyr).observe($('yt'), { attributes: true, attributeFilter: ['hidden'] }); }

@@ -2,22 +2,36 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://apis.google.com https://unpkg.com https://cdn.jsdelivr.net https://www.youtube.com https://www.gstatic.com https://player.twitch.tv https://open.spotify.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://i.ytimg.com; media-src 'self' blob: data: https:; worker-src 'self' blob:; connect-src 'self' blob: wss://0.peerjs.com https://0.peerjs.com https://*.googleapis.com https://*.firebaseapp.com https://accounts.spotify.com https://api.spotify.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com https://player.twitch.tv https://www.twitch.tv https://clips.twitch.tv https://player.kick.com https://kick.com https://www.dailymotion.com https://www.facebook.com https://web.facebook.com https://open.spotify.com https://*.firebaseapp.com https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://apis.google.com https://unpkg.com https://cdn.jsdelivr.net https://www.youtube.com https://www.gstatic.com https://player.twitch.tv https://open.spotify.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://i.ytimg.com; media-src 'self' blob: data: https:; worker-src 'self' blob:; connect-src 'self' blob: https://*.workers.dev wss://0.peerjs.com https://0.peerjs.com https://*.googleapis.com https://*.firebaseapp.com https://accounts.spotify.com https://api.spotify.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com https://player.twitch.tv https://www.twitch.tv https://clips.twitch.tv https://player.kick.com https://kick.com https://www.dailymotion.com https://www.facebook.com https://web.facebook.com https://open.spotify.com https://*.firebaseapp.com https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, viewport-fit=cover">
 <meta name="description" content="anything2gether : regardez ensemble des vidéos publiques (YouTube, Dailymotion, Twitch, Kick, Facebook) ou vos propres fichiers, en synchronisation, avec un chat. Gratuit ; les vidéos ne sont pas stockées sur nos serveurs.">
+<link rel="canonical" href="https://toumiachraf9.github.io/samarafseries/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="anything2gether">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:title" content="anything2gether : regardez des vidéos à deux">
+<meta property="og:description" content="anything2gether : regardez ensemble des vidéos publiques (YouTube, Dailymotion, Twitch, Kick, Facebook) ou vos propres fichiers, en synchronisation, avec un chat. Gratuit ; les vidéos ne sont pas stockées sur nos serveurs.">
+<meta property="og:url" content="https://toumiachraf9.github.io/samarafseries/">
+<meta property="og:image" content="https://toumiachraf9.github.io/samarafseries/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="anything2gether : regardez des vidéos à deux">
+<meta name="twitter:description" content="anything2gether : regardez ensemble des vidéos publiques (YouTube, Dailymotion, Twitch, Kick, Facebook) ou vos propres fichiers, en synchronisation, avec un chat. Gratuit ; les vidéos ne sont pas stockées sur nos serveurs.">
+<meta name="twitter:image" content="https://toumiachraf9.github.io/samarafseries/assets/og-image.png">
 <meta name="theme-color" content="#12111a">
 <link rel="icon" type="image/png" sizes="64x64" href="assets/icon-01-5e150412.png">
 <link rel="apple-touch-icon" sizes="192x192" id="app-icon" href="assets/icon-02-02f68231.png">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <link rel="preconnect" href="https://www.youtube.com">
 <link rel="preconnect" href="https://i.ytimg.com">
-<title>anything2gether</title>
+<title>anything2gether : regardez des vidéos à deux</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css">
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" integrity="sha384-FDFJN4eDoTbFzL8KHLAOmtAicPaFc44D0JrdAwgO91ZDgGmAHrcpMWLCwTxBSVI7" crossorigin="anonymous">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" integrity="sha384-nlUQ8ZqCbvStErob+biJNzSgltf6urV3VGqhfIfzhmg9RXmpeRm76ELw0pYnKlTR" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.min.js" integrity="sha384-1r2GCX3Eml88xgbJb7kOe51vEASmv6hbqDRcK55GxMiwWy/5xX1xFlC6z7saa8Ct" crossorigin="anonymous"></script>
 <script src="js/img-fallback.js"></script>
 <style>
   /* Disposition : l'écran entier est utilisé sans défilement (vidéo + chat). Le fichier est transféré en P2P et lisible pendant la réception. */
