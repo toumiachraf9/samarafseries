@@ -309,7 +309,6 @@
         while (c.open && !c.dead && c.dataChannel && c.dataChannel.bufferedAmount > 0) await sleep(100);
         show(100);
         await sleep(1500);
-        console.log('[fichier] envoyé à', pid, ':', f.name);
       } catch (e) {
         console.error('[fichier]', e);
         if (e && e.message === 'stall' && id === xferId && tries < 4) {
@@ -962,17 +961,6 @@
   }
   // retire une connexion (départ, coupure ou remplacement par une reconnexion)
   // met la vidéo en pause sans que ce soit pris pour une action de l'utilisateur ; renvoie true si quelque chose jouait
-  function pauseAll() {
-    var did = false;
-    if (yt.active) {
-      if (yt.ready && ytPlaying()) { ytWant = false; ytApplyUntil = Date.now() + 2000; try { yt.player.pauseVideo(); } catch (e) {} did = true; }
-    } else if (hasVideo && !video.paused) {
-      applyingUntil = Date.now() + 2000;
-      remote = { playing: false, time: video.currentTime, at: performance.now(), known: true };
-      video.pause(); did = true;
-    }
-    return did;
-  }
   function dropConn(c, quiet) {
     if (c.dead) return;
     c.dead = true;
@@ -2197,7 +2185,6 @@
     $('yt').textContent = ''; $('yt').hidden = true;
     if (!quiet && !hasVideo) { setDrop(DROP0.t, DROP0.x, true); $('fname').textContent = "Aucune vidéo pour l'instant"; }
   }
-  function spotHostStop() { if (spot.active && isHost) { stopSpot(true); broadcast({ t: 'spotstop' }); } }
   var PF_NAME = { youtube: 'YouTube', youtube_audio: 'YouTube (audio seul)', dailymotion: 'Dailymotion', facebook: 'Facebook', twitch: 'Twitch', kick: 'Kick', spotify: 'Spotify' };
   var PF_HINT = {
     youtube: 'https://www.youtube.com/watch?v=...',
@@ -3121,7 +3108,6 @@
     wirePads();
     mSetZoom(multi.zoom);
   }
-  function mIsPlaying() { return !!multi.playing; }
   // muet propre à chaque vidéo et à chaque personne : rien n'est envoyé à l'autre
   function mSetLocalMute(k, on, send) {
     multi['muted' + k] = !!on;
@@ -3132,10 +3118,6 @@
       b.classList.toggle('off', !!on);
       b.innerHTML = on ? '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>' : M_VOL;
     }
-  }
-  function mSetLocalVol(k, v) {
-    var p = k === 'A' ? multi.pa : multi.pb;
-    try { if (multi.kind === 'twitch') p.setVolume(v / 100); else p.setVolume(v); } catch (e) {}
   }
   function mApplyLocalMute() { mSetLocalMute('A', multi.mutedA, false); mSetLocalMute('B', multi.mutedB, false); }
   function updateFitBtn() {
@@ -3308,11 +3290,6 @@
   $('multi-modal').addEventListener('click', function (e) { if (e.target === this) mClose(); });
   var acctUser = null;
   var ACCT_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm0 2.25c-3.2 0-9.5 1.6-9.5 4.75V21h19v-2c0-3.15-6.3-4.75-9.5-4.75z"/></svg>';
-  function hashId(uid) {
-    var h = 2166136261;
-    for (var i = 0; i < uid.length; i++) { h ^= uid.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
-    return String(100000000 + h % 900000000);
-  }
   function renderAcct() {
     renderBrand();
     var t = $('acct-text'), b = $('acct-btn'), note = $('dev-note');
