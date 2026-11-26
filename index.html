@@ -8,16 +8,16 @@
 <link rel="canonical" href="https://toumiachraf9.github.io/samarafseries/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="anything2gether">
-<meta property="og:locale" content="fr_FR">
-<meta property="og:title" content="anything2gether : regardez des vidéos à deux">
-<meta property="og:description" content="anything2gether : regardez ensemble des vidéos publiques (YouTube, Dailymotion, Twitch, Kick, Facebook) ou vos propres fichiers, en synchronisation, avec un chat. Gratuit ; les vidéos ne sont pas stockées sur nos serveurs.">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="anything2gether: watch videos together">
+<meta property="og:description" content="Watch public videos together, in sync, with a chat. Free, and videos are not stored on our servers.">
 <meta property="og:url" content="https://toumiachraf9.github.io/samarafseries/">
 <meta property="og:image" content="https://toumiachraf9.github.io/samarafseries/assets/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="anything2gether : regardez des vidéos à deux">
-<meta name="twitter:description" content="anything2gether : regardez ensemble des vidéos publiques (YouTube, Dailymotion, Twitch, Kick, Facebook) ou vos propres fichiers, en synchronisation, avec un chat. Gratuit ; les vidéos ne sont pas stockées sur nos serveurs.">
+<meta name="twitter:title" content="anything2gether: watch videos together">
+<meta name="twitter:description" content="Watch public videos together, in sync, with a chat. Free, and videos are not stored on our servers.">
 <meta name="twitter:image" content="https://toumiachraf9.github.io/samarafseries/assets/og-image.png">
 <meta name="theme-color" content="#12111a">
 <link rel="icon" type="image/png" sizes="64x64" href="assets/icon-01-5e150412.png">
@@ -398,6 +398,9 @@
   .home-acct { display: flex; align-items: center; gap: 8px; }
   .lang-sel { font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: rgba(18, 17, 26, 0.6); color: #fff; max-width: 130px; }
   .lang-sel option { background: #1b1926; color: #fff; }
+  .how { margin-top: 16px; }
+  .how h2 { font-family: var(--f-display); font-size: 15px; color: var(--accent); margin: 0; }
+  @media (max-height: 640px) { .how { display: none; } }
   .features { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 7px; max-width: 520px; text-align: start; }
   .features li { position: relative; padding-inline-start: 22px; font-size: 14px; line-height: 1.4; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55); }
   .features li::before { content: "✦"; position: absolute; inset-inline-start: 0; top: 0; color: var(--accent); }
@@ -565,6 +568,7 @@
   <div class="intro-box">
       <p class="lede" id="lede" data-i18n="lede">Regardez une vidéo à deux, en même temps, même à distance. Choisissez une vidéo publique (YouTube, Dailymotion, Twitch, Kick, Facebook) ou un fichier que vous possédez : la lecture, la pause et la position sont synchronisées, avec un chat à côté. Les fichiers passent directement entre vous, sans être stockés sur nos serveurs.</p>
       <ul class="features" aria-label="Fonctionnalités"><li data-i18n="f1">Regarder ensemble des vidéos Dailymotion, YouTube, Twitch, Kick et Facebook</li><li data-i18n="f2">Partage de fichier vidéo en direct</li><li data-i18n="f3">Lecture, pause et avance synchronisées</li><li data-i18n="f4">Chat, émojis et photos pendant le film</li><li data-i18n="f5">Thème et fond d'écran partagés</li><li data-i18n="f6">Sans serveur : le fichier passe directement entre vous</li></ul>
+      <section class="how" aria-labelledby="how-h"><h2 id="how-h" data-i18n="how_h">Comment ça marche</h2><ul class="features" aria-label="Comment ça marche"><li data-i18n="how_1">Crée une salle, ou rejoins celle de ton ami avec son ID et son code.</li><li data-i18n="how_2">Choisis une vidéo : un lien YouTube, Dailymotion, Twitch, Kick ou Facebook, ou un fichier de ton appareil.</li><li data-i18n="how_3">Regardez ensemble : lecture, pause et position restent synchronisées, et vous pouvez discuter dans le chat.</li><li data-i18n="how_4">Un compte n'est pas obligatoire.</li></ul></section>
       </div>
   <footer class="site-foot">
     <button class="linkbtn" type="button" data-legal="about" data-i18n="f_about">À propos</button>
