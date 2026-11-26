@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<meta name="robots" content="noindex">
+<title>anything2gether · Jeux</title>
+<link rel="icon" type="image/png" sizes="64x64" href="assets/icon-01-5e150412.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #12111a;
+    --pa: .8;
+    --panel: rgba(27, 25, 38, var(--pa));
+    --panel-2: rgba(36, 33, 47, calc(var(--pa) + .1));
+    --bg-grad: linear-gradient(160deg, #12111a, #1f1a33, #33203a);
+    --dim: 0;
+    --line: #342f44;
+    --fg: #efecf6;
+    --muted: #9a94ad;
+    --accent: #ffb347;
+    --accent-ink: #2a1a00;
+    --peer: #5fd3c4;
+    --danger: #ff7a7a;
+    --f-display: "Unbounded", "Trebuchet MS", sans-serif;
+    --f-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { min-height: 100%; margin: 0; }
+  body { background: var(--bg-grad), var(--bg); background-attachment: fixed; color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.5; }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn { border: 1px solid var(--line); background: var(--panel-2); color: var(--fg); border-radius: 10px; padding: 10px 16px; font-weight: 700; box-shadow: none; }
+  .btn.small { padding: 8px 12px; font-size: 14px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .ghead { position: sticky; top: 0; z-index: 5; display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); backdrop-filter: blur(6px); }
+  #gtitle { font-family: var(--f-display); font-size: 18px; color: var(--accent); }
+  #gbody { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 760px; margin: 0 auto; padding: 14px 16px 40px; }
+  /* ---- écrans de jeu en pleine page ---- */
+  .qhead { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: rgba(251, 244, 238, .85); }
+  #gtitle { font-size: 20px; font-weight: 800; color: #2b3d55; }
+  .btn { background: #2b3d55; color: #fff; border: none; border-radius: 999px; padding: 10px 18px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 0 #1c2a3d; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  #gbody { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 760px; margin: 0 auto; padding: 14px 16px 40px; }
+  .gmsg { font-size: 17px; font-weight: 700; text-align: center; margin: 0; }
+  .gscore { font-size: 14px; font-weight: 600; text-align: center; margin: 0; opacity: .8; }
+  .grow { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
+  .blob { position: relative; background: #2b3d55; border-radius: 46% 54% 50% 50% / 52% 44% 56% 48%; box-shadow: 0 22px 40px rgba(43, 61, 85, .28); }
+  .spike { position: absolute; height: 8px; border-radius: 6px; background: #e8a722; }
+  .rpsblob { width: min(92vw, 420px); height: 330px; }
+  .hand { position: absolute; width: 130px; height: 130px; left: 50%; margin-left: -65px; }
+  .hand.top { top: 2%; }
+  .hand.bottom { bottom: 2%; }
+  .hsvg { width: 100%; height: 100%; display: block; }
+  .hand.top .hsvg { transform: rotate(180deg); }
+  .shake { animation: shake .5s ease-in-out infinite; }
+  @keyframes shake { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
+  .pop { animation: pop .5s cubic-bezier(.3, 1.5, .6, 1); }
+  @keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .choices { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .choice { background: #fff; border: none; border-radius: 20px; padding: 10px 12px 12px; width: 112px; box-shadow: 0 6px 0 #d8cfc6; cursor: pointer; color: #2b3d55; font-weight: 700; font-size: 15px; }
+  .choice .hsvg { width: 64px; height: 64px; margin: 0 auto 4px; }
+  .choice:hover { transform: translateY(-2px); }
+  .tttblob { padding: 26px; }
+  .cgrid { display: grid; grid-template-columns: repeat(3, 90px); gap: 10px; }
+  .cell { width: 90px; height: 90px; border-radius: 22px; background: #3a4f6b; border: none; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 3px 0 rgba(255, 255, 255, .08), 0 6px 0 #1e2c40; cursor: pointer; }
+  .cell:disabled { cursor: default; }
+  .cell.hit { background: #e8a722; }
+  .cell .mark { width: 56px; height: 56px; }
+  .draw { stroke-dasharray: 120; stroke-dashoffset: 120; animation: draw .45s ease forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .c4blob { padding: 22px 26px; }
+  .c4cols2 { display: grid; grid-template-columns: repeat(7, 40px); gap: 6px; margin-bottom: 8px; }
+  .dropbtn { width: 40px; height: 34px; border-radius: 10px; border: none; background: #e8a722; color: #2b3d55; font-weight: 900; cursor: pointer; }
+  .dropbtn:disabled { opacity: .25; cursor: default; }
+  .c4board2 { display: grid; grid-template-columns: repeat(7, 40px); gap: 6px; }
+  .hole { width: 40px; height: 40px; border-radius: 50%; background: #1c2b42; box-shadow: inset 0 3px 6px rgba(0, 0, 0, .5); }
+  .hole.disc.a { background: radial-gradient(circle at 35% 30%, #ffd9c2, #f5a07f 55%, #c96a4b); }
+  .hole.disc.b { background: radial-gradient(circle at 35% 30%, #fff3b0, #e8a722 55%, #a56c0a); }
+  .hole.drop { animation: c4drop .45s cubic-bezier(.3, 1.3, .6, 1); }
+  @keyframes c4drop { from { transform: translateY(-160px); opacity: .2; } to { transform: none; opacity: 1; } }
+  .hole.hit { box-shadow: 0 0 0 3px #fff, 0 0 14px #fff; }
+  .wblob { padding: 22px 26px; }
+  .wgrid2 { display: grid; grid-template-columns: repeat(5, 48px); gap: 6px; }
+  .tile { width: 48px; height: 48px; border-radius: 10px; background: #3a4f6b; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; }
+  .tile.ok { background: #e8a722; color: #2b3d55; }
+  .tile.mid { background: #f5a07f; color: #2b3d55; }
+  .tile.flip { animation: flip .5s ease both; }
+  @keyframes flip { 0% { transform: rotateX(0); } 50% { transform: rotateX(90deg); } 100% { transform: rotateX(0); } }
+  .wrow { display: flex; gap: 8px; align-items: center; }
+  .wig { padding: 10px 14px; border-radius: 999px; border: 2px solid #2b3d55; font-size: 16px; text-transform: uppercase; width: 180px; }
+  .qcard { background: #fff; border-radius: 26px; padding: 22px; width: min(92vw, 520px); box-shadow: 0 16px 0 rgba(43, 61, 85, .15), 0 24px 40px rgba(43, 61, 85, .2); }
+  .qprog { font-size: 12px; font-weight: 700; color: #d9826a; text-transform: uppercase; letter-spacing: .08em; }
+  .qq { font-size: 20px; font-weight: 800; margin: 8px 0 14px; }
+  .qopts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .qopt { border: none; border-radius: 16px; padding: 14px 10px; font-weight: 700; font-size: 15px; cursor: pointer; color: #2b3d55; box-shadow: 0 5px 0 rgba(43, 61, 85, .2); text-align: start; }
+  .qopt.q0 { background: #bfe9dc; }
+  .qopt.q1 { background: #fde0cf; }
+  .qopt.q2 { background: #f7cadb; }
+  .qopt.q3 { background: #fff0b3; }
+  .qopt:disabled { opacity: .7; cursor: default; }
+  .qopt.right { outline: 4px solid #2e9e4f; }
+  .qopt.wrong { outline: 4px solid #c44; }
+  .menu { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; width: min(92vw, 520px); }
+  .mcard { border: none; border-radius: 22px; padding: 26px 14px; font-weight: 800; font-size: 17px; color: #2b3d55; cursor: pointer; box-shadow: 0 6px 0 rgba(43, 61, 85, .2); }
+  .mcard.g0 { background: #bfe9dc; }
+  .mcard.g1 { background: #fde0cf; }
+  .mcard.g2 { background: #f7cadb; }
+  .mcard.g3 { background: #fff0b3; }
+  .mcard.g4 { background: #d9cdf2; }
+
+  /* thème du site : fond sombre, accent jaune, panneaux foncés */
+  .gmsg, .gscore { color: var(--fg); }
+  .gscore { opacity: .75; }
+  .blob { background: var(--panel-2); border: 1px solid var(--line); box-shadow: 0 22px 40px rgba(0, 0, 0, .45); }
+  .spike { background: var(--accent); }
+  .choice, .qcard { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); box-shadow: none; }
+  .choice .hsvg { filter: none; }
+  .cell { background: var(--panel); }
+  .cell.hit { background: var(--accent); }
+  .tile { background: var(--panel); }
+  .tile.ok { background: var(--accent); color: var(--accent-ink); }
+  .tile.mid { background: #e07a52; color: #fff; }
+  .hole { background: var(--bg); }
+  .c4cell.p1, .hole.disc.a { filter: none; }
+  .qopt.q0, .qopt.q1, .qopt.q2, .qopt.q3 { background: var(--panel); color: var(--fg); border: 1px solid var(--line); box-shadow: 0 5px 0 rgba(0, 0, 0, .35); }
+  .qopt.right { outline-color: #2e9e4f; }
+  .qopt.wrong { outline-color: var(--danger); }
+  .qprog { color: var(--accent); }
+  .qq { color: var(--fg); }
+  .mcard { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); box-shadow: 0 6px 0 rgba(0, 0, 0, .35); }
+  .mcard:hover { border-color: var(--accent); }
+  .wig { background: var(--panel); color: var(--fg); border-color: var(--accent); }
+  .dropbtn { background: var(--accent); color: var(--accent-ink); }
+  .dropbtn:disabled { opacity: .25; }
+  .tile.flip, .hole.drop { animation-duration: .5s; }
+</style>
+</head>
+<body>
+<header class="ghead"><b id="gtitle">Jeux</b><button class="btn small" id="g-close" type="button">Fermer</button></header>
+<main id="gbody"></main>
+<script src="js/games.js"></script>
+</body>
+</html>

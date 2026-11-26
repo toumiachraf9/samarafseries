@@ -810,6 +810,210 @@
   }
   $('q-link-add').addEventListener('click', addLinkToQueue);
   $('q-link').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addLinkToQueue(); } });
+  // ---------- jeux à plusieurs : l'hôte garde la partie et valide chaque coup ----------
+  var GAME = null, GAME_SECRET = null, GAME_SEQ = 0;
+  var GAME_NAMES = { ttt: 'Morpion', rps: 'Pierre-feuille-ciseaux', c4: 'Puissance 4', wordle: 'Mot mystère', quiz: 'Quiz' };
+  var GAME_TWO = { ttt: 1, rps: 1, c4: 1 };
+  var WORDS = ['chien','table','livre','arbre','route','fleur','nuage','pomme','lampe','porte','verre','plage','sable','neige','vague','poule','poire','rouge','jaune','orage','pluie','fruit','carte','bleue'];
+  var RPS_CH = ['Pierre', 'Feuille', 'Ciseaux'];
+  var RPS_ICON = { Pierre: '✊', Feuille: '✋', Ciseaux: '✌️' };
+  var QUIZ = [
+    { q: 'Quelle est la capitale de la Tunisie ?', c: ['Sfax', 'Tunis', 'Sousse', 'Bizerte'], a: 1 },
+    { q: 'Combien de continents y a-t-il ?', c: ['5', '6', '7', '8'], a: 2 },
+    { q: 'Quel est le plus grand océan ?', c: ['Atlantique', 'Indien', 'Arctique', 'Pacifique'], a: 3 },
+    { q: 'Combien de côtés a un hexagone ?', c: ['5', '6', '7', '8'], a: 1 },
+    { q: 'Quelle planète est la plus proche du Soleil ?', c: ['Vénus', 'Mars', 'Mercure', 'Terre'], a: 2 },
+    { q: 'Combien font 12 × 12 ?', c: ['124', '132', '144', '156'], a: 2 },
+    { q: 'Qui a peint la Joconde ?', c: ['Van Gogh', 'Léonard de Vinci', 'Picasso', 'Monet'], a: 1 },
+    { q: 'Quel est le plus petit pays du monde ?', c: ['Monaco', 'Vatican', 'Malte', 'Saint-Marin'], a: 1 }
+  ];
+  var TTT_LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+  function gPlayerIndex(g, cid) { if (!g || !g.players) return -1; for (var i = 0; i < g.players.length; i++) if (g.players[i].cid === cid) return i; return -1; }
+  function gName(g, i) { return g.players[i] ? g.players[i].name : '?'; }
+  function gNorm(v) { return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]/g, ''); }
+  function gNew(type, cid, name) {
+    var g = { id: ++GAME_SEQ, type: type, status: GAME_TWO[type] ? 'lobby' : 'play', players: [{ cid: cid, name: name }], turn: 0, msg: '' };
+    GAME_SECRET = {};
+    if (type === 'ttt') g.board = ['', '', '', '', '', '', '', '', ''];
+    if (type === 'c4') { g.board = []; for (var r = 0; r < 6; r++) g.board.push([0, 0, 0, 0, 0, 0, 0]); }
+    if (type === 'rps') { g.score = [0, 0, 0]; g.picked = {}; g.result = null; }
+    if (type === 'wordle') { g.rows = []; GAME_SECRET.word = WORDS[Math.floor(Math.random() * WORDS.length)]; }
+    if (type === 'quiz') { g.qi = 0; g.answers = {}; g.pn = {}; g.scores = {}; g.revealed = false; }
+    return g;
+  }
+  function gWinLine(b) {
+    for (var i = 0; i < TTT_LINES.length; i++) { var l = TTT_LINES[i]; if (b[l[0]] && b[l[0]] === b[l[1]] && b[l[0]] === b[l[2]]) return l; }
+    return null;
+  }
+  function c4Win(b, r, c) {
+    var v = b[r][c], dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+    for (var d = 0; d < 4; d++) {
+      var cells = [[r, c]], dr = dirs[d][0], dc = dirs[d][1];
+      for (var s2 = -1; s2 <= 1; s2 += 2) {
+        var rr = r + dr * s2, cc = c + dc * s2;
+        while (rr >= 0 && rr < 6 && cc >= 0 && cc < 7 && b[rr][cc] === v) { cells.push([rr, cc]); rr += dr * s2; cc += dc * s2; }
+      }
+      if (cells.length >= 4) return cells;
+    }
+    return null;
+  }
+  function wordleScore(guess, word) {
+    var r = ['no', 'no', 'no', 'no', 'no'], cnt = {}, i;
+    for (i = 0; i < 5; i++) { if (guess[i] === word[i]) r[i] = 'ok'; else cnt[word[i]] = (cnt[word[i]] || 0) + 1; }
+    for (i = 0; i < 5; i++) if (r[i] !== 'ok' && cnt[guess[i]] > 0) { r[i] = 'mid'; cnt[guess[i]]--; }
+    return r;
+  }
+  function gReveal(g) {
+    var Q = QUIZ[g.qi]; g.revealed = true; g.correct = Q.a;
+    Object.keys(g.answers).forEach(function (k) { if (g.answers[k] === Q.a) g.scores[k] = (g.scores[k] || 0) + 1; });
+  }
+  // seul l'hôte exécute ceci : il valide le coup puis diffuse l'état
+  function gApply(act, cid, name) {
+    if (!act || typeof act !== 'object') return;
+    var a = act.a;
+    if (a === 'open') {
+      if (GAME || !GAME_NAMES[act.type]) return;
+      GAME = gNew(act.type, cid, name); GAME.invite = { cid: cid, name: name }; return;
+    }
+    if (!GAME) return;
+    var g = GAME, me = gPlayerIndex(g, cid);
+    if (a === 'close') { GAME = null; GAME_SECRET = null; return; }
+    if (a === 'join') {
+      if (act.gid && act.gid !== g.id) return;
+      if (GAME_TWO[g.type] && g.status === 'lobby' && me < 0) { g.players.push({ cid: cid, name: name }); g.status = 'play'; g.msg = ''; }
+      return;
+    }
+    if (g.type === 'ttt' && a === 'move' && g.status === 'play' && me === g.turn) {
+      var i = act.i | 0;
+      if (i < 0 || i > 8 || g.board[i]) return;
+      g.board[i] = me === 0 ? 'X' : 'O';
+      g.last = i;
+      var ln = gWinLine(g.board);
+      if (ln || g.board.every(function (x) { return x; })) { g.status = 'over'; g.winner = ln ? me : -1; g.line = ln; }
+      else g.turn = 1 - g.turn;
+      return;
+    }
+    if (g.type === 'c4' && a === 'move' && g.status === 'play' && me === g.turn) {
+      var col = act.col | 0;
+      if (col < 0 || col > 6) return;
+      var row = -1;
+      for (var r = 5; r >= 0; r--) if (!g.board[r][col]) { row = r; break; }
+      if (row < 0) return;
+      g.board[row][col] = me + 1; g.last = [row, col];
+      var cw = c4Win(g.board, row, col);
+      if (cw) { g.status = 'over'; g.winner = me; g.line = cw; }
+      else if (g.board[0].every(function (x) { return x; })) { g.status = 'over'; g.winner = -1; }
+      else g.turn = 1 - g.turn;
+      return;
+    }
+    if (g.type === 'rps' && me >= 0 && g.players.length === 2) {
+      if (a === 'next' && g.result) { g.result = null; g.msg = ''; return; }
+      if (a === 'pick' && !g.result && RPS_CH.indexOf(act.c) >= 0 && !g.picked[cid]) {
+        GAME_SECRET[cid] = act.c; g.picked[cid] = true;
+        var ids = [g.players[0].cid, g.players[1].cid];
+        if (g.picked[ids[0]] && g.picked[ids[1]]) {
+          var x = RPS_CH.indexOf(GAME_SECRET[ids[0]]), y = RPS_CH.indexOf(GAME_SECRET[ids[1]]);
+          var win = x === y ? -1 : ((x + 1) % 3 === y ? 1 : 0);
+          g.result = { c: [RPS_CH[x], RPS_CH[y]], w: win };
+          if (win < 0) g.score[2]++; else g.score[win]++;
+          g.picked = {}; GAME_SECRET = {};
+        }
+      }
+      return;
+    }
+    if (g.type === 'wordle' && a === 'guess' && g.status === 'play') {
+      var gw = gNorm(act.w);
+      if (gw.length !== 5) { g.msg = 'Le mot doit faire 5 lettres.'; return; }
+      g.msg = '';
+      g.rows.push({ w: gw, r: wordleScore(gw, GAME_SECRET.word), by: name });
+      if (gw === GAME_SECRET.word) { g.status = 'over'; g.won = true; g.word = GAME_SECRET.word; }
+      else if (g.rows.length >= 6) { g.status = 'over'; g.won = false; g.word = GAME_SECRET.word; }
+      return;
+    }
+    if (g.type === 'quiz') {
+      if (a === 'answer' && !g.revealed && g.status === 'play' && g.answers[cid] === undefined) {
+        var k = act.k | 0;
+        if (k < 0 || k > 3) return;
+        g.answers[cid] = k; g.pn[cid] = name;
+        if (Object.keys(g.answers).length >= Math.max(1, roomCount)) gReveal(g);
+        return;
+      }
+      if (a === 'reveal' && !g.revealed && g.status === 'play') { gReveal(g); return; }
+      if (a === 'nextq' && g.revealed) {
+        g.qi++; g.answers = {}; g.revealed = false; delete g.correct;
+        if (g.qi >= QUIZ.length) g.status = 'over';
+      }
+    }
+  }
+  function gBroadcast() { broadcast({ t: 'gstate', g: GAME }); renderGame(); }
+  // une action vient de cette personne : l'hôte l'applique directement, les autres l'envoient à l'hôte
+  function gAction(act) {
+    if (isHost) { gApply(act, myCid, myName); gBroadcast(); }
+    else broadcast({ t: 'gact', act: act, cid: myCid, name: myName });
+  }
+  function gBtn(text, fn, dis) {
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'btn small'; b.textContent = text;
+    if (dis) b.disabled = true; else b.addEventListener('click', fn);
+    return b;
+  }
+  function gStatus(g, mine) {
+    if (g.status === 'lobby') return "En attente d'un second joueur…";
+    if (g.type === 'ttt' || g.type === 'c4') {
+      if (g.status === 'over') return g.winner < 0 ? 'Match nul !' : gName(g, g.winner) + ' a gagné !';
+      return 'Au tour de ' + gName(g, g.turn) + (g.turn === mine ? ' (toi)' : '');
+    }
+    if (g.type === 'rps') {
+      if (g.result) return g.result.w < 0 ? 'Égalité !' : gName(g, g.result.w) + ' gagne la manche !';
+      if (mine < 0) return 'Les deux joueurs choisissent en secret.';
+      if (g.picked[myCid]) return "Choix envoyé, en attente de l'adversaire…";
+      return 'Fais ton choix.';
+    }
+    if (g.type === 'wordle') {
+      if (g.status === 'over') return g.won ? 'Bravo, trouvé !' : 'Perdu. Le mot était : ' + String(g.word).toUpperCase();
+      return 'Essai ' + (g.rows.length + 1) + ' / 6 : propose un mot de 5 lettres.';
+    }
+    if (g.type === 'quiz') return g.status === 'over' ? 'Quiz terminé !' : 'Question ' + (g.qi + 1) + ' / ' + QUIZ.length;
+    return '';
+  }
+  function gScoreText(g) {
+    return Object.keys(g.pn || {}).map(function (k) { return g.pn[k] + ' : ' + (g.scores[k] || 0); }).join(' · ');
+  }
+  // ---------- jeux : la page des jeux (games.html) s'affiche dans un cadre ; l'hôte garde la partie ----------
+  var seenInvite = null;
+  function renderGame() {
+    var f = $('gframe');
+    if (f && f.contentWindow) f.contentWindow.postMessage({ src: 'parent', init: { me: myCid, name: myName, host: isHost }, g: GAME }, location.origin);
+    updateInvite();
+  }
+  function updateInvite() {
+    var box = $('ginvite'); if (!box) return;
+    var g = GAME, show = false;
+    if (g && g.invite && g.invite.cid !== myCid && seenInvite !== g.id && gPlayerIndex(g, myCid) < 0 &&
+        (GAME_TWO[g.type] ? g.status === 'lobby' : g.status === 'play')) show = true;
+    box.hidden = !show;
+    if (show) $('ginvite-text').textContent = g.invite.name + " t'invite à jouer : " + GAME_NAMES[g.type];
+  }
+  function openGames() { $('gframe').hidden = false; renderGame(); }
+  function closeGames() { $('gframe').hidden = true; }
+  function acceptInvite() {
+    var g = GAME; if (!g) return;
+    seenInvite = g.id; openGames();
+    if (GAME_TWO[g.type] && g.status === 'lobby') gAction({ a: 'join', gid: g.id });
+    updateInvite();
+  }
+  function declineInvite() { if (GAME) seenInvite = GAME.id; updateInvite(); }
+  window.addEventListener('message', function (e) {
+    var f = $('gframe'); if (!f || e.source !== f.contentWindow || e.origin !== location.origin) return;
+    var d = e.data || {};
+    if (d.src !== 'games') return;
+    if (d.ready) renderGame();
+    if (d.act) gAction(d.act);
+    if (d.close) closeGames();
+  });
+  $('btn-games').addEventListener('click', function () { if ($('gframe').hidden) openGames(); else closeGames(); });
+  $('ginvite-yes').addEventListener('click', acceptInvite);
+  $('ginvite-no').addEventListener('click', declineInvite);
   function toggleQueue() { $('qpanel').hidden = !$('qpanel').hidden; }
   // fin de la vidéo : l'hôte enchaîne avec la suivante
   video.addEventListener('ended', function () {
@@ -1085,6 +1289,7 @@
   // envoyé à l'autre dès que son 'hello' est reçu (on connaît alors son identifiant et ce qu'il possède déjà)
   function welcome(c, d) {
     if (isHost) c.send({ t: 'mode', m: roomMode });
+    if (isHost) c.send({ t: 'gstate', g: GAME });
     if (localFile) {
       if (d.q && QUALS[d.q]) qFor[c.peer] = d.q;                              // qualité choisie par cette personne
       if (d.a && AUDIO[d.a]) aFor[c.peer] = d.a;                              // son choisi par cette personne
@@ -1140,6 +1345,12 @@
       case 'sys': addMsg('', d.text, 'sys'); break;
       case 'count': if (!isHost) { roomCount = +d.n || 0; roomNames = Array.isArray(d.names) ? d.names.map(function (x) { return String(x).slice(0, 20); }) : []; updateStatus(); } break;
       case 'ready': if (isHost) c.ready = !!d.ok; break;
+      case 'gstate':
+        if (!isHost) { var wasGame = GAME; GAME = d.g || null; if (GAME && !wasGame) showToast('Jeux', 'Une partie vient de commencer'); renderGame(); }
+        break;
+      case 'gact':
+        if (isHost) { gApply(d.act, String(d.cid || '').slice(0, 40), String(d.name || '').slice(0, 20)); gBroadcast(); }
+        break;
       case 'react': applyReact(d.mid, d.e); break;
       case 'chat':
         delete typers[d.cid]; renderTyping();
@@ -2419,6 +2630,7 @@
     conns = []; peer = null;
     document.body.classList.remove('in-room');
     $('room').hidden = true; $('home').hidden = false;
+    GAME = null;
     $('home-error').textContent = msg || '';
     renderHistory();
   }
