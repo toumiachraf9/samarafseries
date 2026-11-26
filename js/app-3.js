@@ -1001,6 +1001,7 @@
     $('gframe').hidden = true;
   }
   window.closeGamesFromFrame = closeGames;
+  window.gameAct = function (a) { gAction(a); };
   $('gframe').addEventListener('load', renderGame);
   function acceptInvite() {
     var g = GAME; if (!g) return;

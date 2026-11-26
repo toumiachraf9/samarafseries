@@ -12,12 +12,12 @@ function pendingDone(a) {
   return true;
 }
 function act(a) {
-  GAME_ACT(a);
+  sendAct(a);
   if (['pick', 'join', 'answer', 'move'].indexOf(a.a) < 0) return;
   PENDING = a; PENDING_TRIES = 0; clearInterval(PENDING_T);
   PENDING_T = setInterval(function () {
     if (!PENDING || pendingDone(PENDING) || ++PENDING_TRIES > 5) { clearInterval(PENDING_T); PENDING = null; return; }
-    GAME_ACT(PENDING);
+    sendAct(PENDING);
   }, 1200);
 }
 function $(id) { return document.getElementById(id); }
