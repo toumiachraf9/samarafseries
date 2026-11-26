@@ -733,6 +733,32 @@
   /* ---------- file d'attente (hôte uniquement) ---------- */
   var queue = [];
   function isVideoFile(f) { return f && (f.type.indexOf('video') === 0 || /\.(mkv|mp4|m4v|mov|webm)$/i.test(f.name)); }
+  // file d'attente avec des liens : YouTube (lecteur intégré) ou une autre plateforme (lecteur de la plateforme)
+  function linkEntry(raw) {
+    var p = parseYt(raw);
+    if (p) return { isLink: true, kind: 'yt', yt: p, name: 'YouTube', url: raw };
+    var e = parseEmbed(raw);
+    if (e) return { isLink: true, kind: 'embed', embed: e, name: e.label, url: raw };
+    return null;
+  }
+  function startLink(f) {
+    if (f.kind === 'yt') {
+      startYT(f.yt.id, f.yt.start, true, { playing: true, time: f.yt.start || 0 }, false);
+      broadcast({ t: 'yt', id: f.yt.id, start: f.yt.start, name: myName, audio: false });
+    } else {
+      startEmbed(f.embed.src, f.embed.label, true);
+      broadcast({ t: 'embed', src: f.embed.src, label: f.embed.label, name: myName });
+    }
+  }
+  function addLinkToQueue() {
+    if (!isHost) return;
+    var raw = $('q-link').value.trim(), err = $('q-link-err');
+    var f = linkEntry(raw);
+    if (!f) { err.textContent = "Ce lien n'est pas reconnu. Colle un lien YouTube, Dailymotion, Twitch, Kick ou Facebook."; return; }
+    err.textContent = ''; $('q-link').value = '';
+    queue.push(f); renderQueue();
+    if (!hasVideo && !yt.active && !embedSrc) playNext();
+  }
   function renderQueue() {
     var n = queue.length, label = n ? "File d'attente (" + n + ')' : "File d'attente";
     $('btn-queue').textContent = label; $('fs-queue').textContent = label;
@@ -746,8 +772,8 @@
     queue.forEach(function (f, i) {
       var li = document.createElement('li'); li.className = 'qitem';
       var num = document.createElement('span'); num.className = 'qn'; num.textContent = (i + 1) + '.';
-      var nm = document.createElement('span'); nm.className = 'qname'; nm.textContent = f.name; nm.title = f.name;
-      var sz = document.createElement('span'); sz.className = 'qsize'; sz.textContent = fmtSize(f.size);
+      var nm = document.createElement('span'); nm.className = 'qname'; var shown = f.isLink ? f.name + ' · ' + f.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 45) : f.name; nm.textContent = shown; nm.title = shown;
+      var sz = document.createElement('span'); sz.className = 'qsize'; sz.textContent = f.isLink ? 'lien' : fmtSize(f.size);
       li.appendChild(num); li.appendChild(nm); li.appendChild(sz);
       function mk(txt, label, fn, off) {
         var b = document.createElement('button'); b.type = 'button'; b.textContent = txt; b.setAttribute('aria-label', label);
@@ -762,7 +788,7 @@
     });
   }
   function startFromQueue(f) {
-    loadFile(f).then(function (ok) { if (ok) tryPlay(); });
+    if (f.isLink) startLink(f); else loadFile(f).then(function (ok) { if (ok) tryPlay(); });
     $('qpanel').hidden = true;
     var rest = queue.length;
     var txt = 'Lecture : ' + f.name + (rest ? ' · ' + rest + ' en attente' : '');
@@ -782,6 +808,8 @@
     renderQueue();
     if (added && !hasVideo) playNext();          // rien en cours : on démarre tout de suite
   }
+  $('q-link-add').addEventListener('click', addLinkToQueue);
+  $('q-link').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addLinkToQueue(); } });
   function toggleQueue() { $('qpanel').hidden = !$('qpanel').hidden; }
   // fin de la vidéo : l'hôte enchaîne avec la suivante
   video.addEventListener('ended', function () {
@@ -839,7 +867,7 @@
     im.onerror = function () { URL.revokeObjectURL(url); cb(null); };
     im.src = url;
   }
-  function addMsg(who, text, cls) {
+  function addMsg(who, text, cls, ts) {
     var box = $('msgs'), el = document.createElement('div');
     el.className = 'msg ' + (cls || '');
     if (cls === 'sys') {
@@ -854,6 +882,10 @@
         var w = document.createElement('span'); w.className = 'who'; w.textContent = who;
         el.appendChild(w);
       }
+      var tm = document.createElement('span'); tm.className = 'time';
+      var when = ts && isFinite(+ts) ? new Date(+ts) : new Date();
+      tm.textContent = when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      el.appendChild(tm);
       var t = document.createElement('span'); t.className = 'txt'; renderText(t, text);
       if (EMOJI_ONLY.test(text)) el.classList.add('big');
       el.appendChild(t);
@@ -914,11 +946,53 @@
   function openConns() { return conns.filter(function (c) { return c.open; }); }
   // le nombre de spectateurs n'est affiché que chez l'hôte (celui qui a créé la salle)
   var roomCount = 0;   // nombre de personnes dans la salle (hôte compris), annoncé par l'hôte toutes les 3 s
+  var roomNames = [];
+  function memberNames() {
+    return [myName].concat(openConns().map(function (c) { return c.pname; }).filter(Boolean)).slice(0, 12);
+  }
+  // réactions : un tap sur un message ouvre 4 émojis ; les réactions sont relayées à toute la salle
+  var REACTS = ['👍', '😂', '❤️', '😮'];
+  function tagMsg(mid) {
+    if (!mid) return;
+    var el = $('msgs').lastElementChild; if (!el || el.classList.contains('sys')) return;
+    el.dataset.mid = mid;
+    el.addEventListener('click', function (ev) {
+      if (ev.target.closest && (ev.target.closest('a') || ev.target.closest('.rbar'))) return;
+      toggleReactBar(el, mid);
+    });
+  }
+  function toggleReactBar(el, mid) {
+    var old = el.querySelector('.rbar');
+    if (old) { old.remove(); return; }
+    var bar = document.createElement('div'); bar.className = 'rbar';
+    REACTS.forEach(function (e) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = e;
+      b.addEventListener('click', function (ev) { ev.stopPropagation(); bar.remove(); sendReact(mid, e); });
+      bar.appendChild(b);
+    });
+    el.appendChild(bar);
+  }
+  function sendReact(mid, e) { applyReact(mid, e); broadcast({ t: 'react', mid: mid, e: e }); }
+  function applyReact(mid, e) {
+    if (!mid || REACTS.indexOf(e) < 0) return;
+    var el = null;
+    Array.prototype.forEach.call($('msgs').children, function (c) { if (c.dataset && c.dataset.mid === String(mid)) el = c; });
+    if (!el) return;
+    el._rx = el._rx || {}; el._rx[e] = (el._rx[e] || 0) + 1;
+    var box = el.querySelector('.reacts');
+    if (!box) { box = document.createElement('div'); box.className = 'reacts'; el.appendChild(box); }
+    box.textContent = '';
+    Object.keys(el._rx).forEach(function (k) {
+      var sp = document.createElement('span'); sp.textContent = k + ' ' + el._rx[k]; box.appendChild(sp);
+    });
+  }
   function updateStatus() {
     var seen = {}, n = 0, dot = $('dot'), txt = $('status-text');
     openConns().forEach(function (c) { var k = c.cid || c.peer; if (!seen[k]) { seen[k] = 1; n++; } });
     if (isHost) roomCount = n + 1;
-    if (n > 0) { dot.className = 'dot ok'; txt.textContent = roomCount > 1 ? roomCount + ' en ligne' : 'Connecté'; }
+    if (n > 0) { dot.className = 'dot ok'; if (isHost) roomNames = memberNames();
+    txt.textContent = roomCount > 1 ? roomCount + ' en ligne' + (roomNames.length ? ' · ' + roomNames.join(', ') : '') : 'Connecté';
+    txt.title = roomNames.join(', '); }
     else { dot.className = 'dot wait'; txt.textContent = isHost ? "En attente d'un ami…" : (joinedOnce ? 'Connexion perdue · reconnexion…' : 'Connexion…'); }
     if (window.__theme) window.__theme.refresh();
   }
@@ -926,7 +1000,7 @@
   setInterval(function () {
     if (!isHost || !peer || !openConns().length) return;
     updateStatus();
-    broadcast({ t: 'count', n: roomCount });
+    broadcast({ t: 'count', n: roomCount, names: memberNames() });
   }, 3000);
   function setDrop(title, text, showPick, progress) {
     $('drop').hidden = false;
@@ -1004,8 +1078,8 @@
     c.on('close', function () { dropConn(c); });
     c.on('error', updateStatus);
   }
-  function pushHistory(mid, name, text, cid) {
-    history.push({ mid: mid, name: String(name || '').slice(0, 20), text: String(text).slice(0, 500), cid: cid });
+  function pushHistory(mid, name, text, cid, ts) {
+    history.push({ mid: mid, name: String(name || '').slice(0, 20), text: String(text).slice(0, 500), cid: cid, ts: ts });
     if (history.length > 200) history.shift();
   }
   // envoyé à l'autre dès que son 'hello' est reçu (on connaît alors son identifiant et ce qu'il possède déjà)
@@ -1028,11 +1102,12 @@
   }
   function handle(d, c) {
     if (!d || !d.t) return;
-    if (isHost && /^(chat|img|typing|state|hb|source|subs|yt|ytstate|yths|ytstop|quality)$/.test(d.t)) broadcast(d, c);
+    if (isHost && /^(chat|img|typing|state|hb|source|subs|yt|ytstate|yths|ytstop|quality|react)$/.test(d.t)) broadcast(d, c);
     switch (d.t) {
       case 'denied':                                 // l'hôte a refusé le code d'accès
         noReconnect = true; backHome("Code d'accès incorrect pour cette salle. Vérifie l'ID et le code."); return;
       case 'hello':                                  // arrivée silencieuse : rien dans le chat
+        if (isHost) c.pname = String(d.name || '').slice(0, 20);
         if (isHost && d.code !== roomCode) {         // mauvais code d'accès : connexion refusée
           c.replaced = true; c.wasOpen = false;
           try { c.send({ t: 'denied' }); } catch (e) {}
@@ -1063,14 +1138,15 @@
         renderTyping();
         break;
       case 'sys': addMsg('', d.text, 'sys'); break;
-      case 'count': if (!isHost) { roomCount = +d.n || 0; updateStatus(); } break;
+      case 'count': if (!isHost) { roomCount = +d.n || 0; roomNames = Array.isArray(d.names) ? d.names.map(function (x) { return String(x).slice(0, 20); }) : []; updateStatus(); } break;
       case 'ready': if (isHost) c.ready = !!d.ok; break;
+      case 'react': applyReact(d.mid, d.e); break;
       case 'chat':
         delete typers[d.cid]; renderTyping();
         if (typeof d.text !== 'string') break;
         if (d.mid) { if (seenMids[d.mid]) break; seenMids[d.mid] = 1; }
-        if (isHost) pushHistory(d.mid, d.name, d.text, d.cid);
-        addMsg(String(d.name || '').slice(0, 20), d.text.slice(0, 500), ''); showToast(String(d.name || '').slice(0, 20), d.text.slice(0, 500)); notifyNew(String(d.name || 'Ami').slice(0, 20), d.text.slice(0, 120)); break;
+        if (isHost) pushHistory(d.mid, d.name, d.text, d.cid, d.ts);
+        addMsg(String(d.name || '').slice(0, 20), d.text.slice(0, 500), '', d.ts); tagMsg(d.mid); showToast(String(d.name || '').slice(0, 20), d.text.slice(0, 500)); notifyNew(String(d.name || 'Ami').slice(0, 20), d.text.slice(0, 120)); break;
       case 'img':
         if (typeof d.data !== 'string' || !/^data:image\/(jpeg|png|webp|gif);base64,/.test(d.data) || d.data.length > 600000) break;
         if (d.mid) { if (seenMids[d.mid]) break; seenMids[d.mid] = 1; }
@@ -1084,7 +1160,7 @@
           if (m.mid) seenMids[m.mid] = 1;
           if (!shown) addMsg('', firstTime ? 'Messages du salon :' : 'Messages reçus pendant ton absence :', 'sys');
           shown++;
-          addMsg(String(m.name || '').slice(0, 20), m.text.slice(0, 500), (m.cid && m.cid === myCid) ? 'me' : '');
+          addMsg(String(m.name || '').slice(0, 20), m.text.slice(0, 500), (m.cid && m.cid === myCid) ? 'me' : '', m.ts);
         });
         break;
       case 'source':
@@ -2344,10 +2420,12 @@
     document.body.classList.remove('in-room');
     $('room').hidden = true; $('home').hidden = false;
     $('home-error').textContent = msg || '';
+    renderHistory();
   }
   var roomPushed = false;
   function enterRoom() {
     saveSession();
+    try { saveHistory(roomId); } catch (e) {}
     holdScreen(true);
     // flèche « retour » du navigateur : dans la salle, elle fait la même chose que « Quitter » (retour à l'accueil)
     try { if (!roomPushed) { window.history.pushState({ a2gRoom: 1 }, ''); roomPushed = true; } } catch (e) {}
@@ -2390,6 +2468,24 @@
     if (/^[1-9][0-9]{8}$/.test(d)) { myDev = d; $('dev-id').textContent = fmtId(myDev); }
     else setNewDev();
   }
+  // salles récentes : seulement l'ID est gardé ; le code d'accès est toujours demandé
+  function readHistory() { try { return JSON.parse(localStorage.getItem('a2g-history') || '[]'); } catch (e) { return []; } }
+  function saveHistory(id) {
+    if (!id) return;
+    var h = readHistory().filter(function (x) { return String(x) !== String(id); });
+    h.unshift(String(id));
+    try { localStorage.setItem('a2g-history', JSON.stringify(h.slice(0, 5))); } catch (e) {}
+  }
+  function renderHistory() {
+    var box = $('hist'), list = $('hist-list'); if (!box || !list) return;
+    var h = readHistory(); list.textContent = ''; box.hidden = !h.length;
+    h.forEach(function (id) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'btn small'; b.textContent = fmtId(id);
+      b.addEventListener('click', function () { $('room-id').value = fmtId(id); $('home-error').textContent = ''; $('code').focus(); });
+      list.appendChild(b);
+    });
+  }
+  renderHistory();
   function fmtId(id) { return String(id || '').replace(/(\d{3})(?=\d)/g, '$1 '); }
   function cleanId(v) { return String(v || '').replace(/\D/g, '').slice(0, 9); }
   function lastJoinId() {
@@ -2750,11 +2846,12 @@
       lastTry = 0; guestLink();
       return;
     }
+    var ts = Date.now();
     var mid = myCid + '-' + (++msgSeq) + '-' + Date.now().toString(36);
     seenMids[mid] = 1;
-    if (isHost) pushHistory(mid, myName, text, myCid);
-    addMsg(myName, text, 'me');
-    broadcast({ t: 'chat', name: myName, text: text, cid: myCid, mid: mid });
+    if (isHost) pushHistory(mid, myName, text, myCid, ts);
+    addMsg(myName, text, 'me', ts); tagMsg(mid);
+    broadcast({ t: 'chat', name: myName, text: text, cid: myCid, mid: mid, ts: ts });
     lastTypingSent = 0;
     inp.value = '';
     $('picker').hidden = true;
@@ -2833,7 +2930,7 @@
      Le service de comptes (Firebase) est chargé à part ; il annonce l'utilisateur par l'événement « a2g-user ».
      Connecté : le prénom vient du compte, et l'ID de salle est calculé à partir du compte (le même sur tous les appareils). */
   /* ---------- langue de l'accueil et nom affiché ---------- */
-  var I18N = {"fr": {"lede": "Regardez une vidéo à deux, en même temps, même à distance. Choisissez une vidéo publique (YouTube, Dailymotion, Twitch, Kick, Facebook) ou un fichier que vous possédez : la lecture, la pause et la position sont synchronisées, avec un chat à côté. Les fichiers passent directement entre vous, sans être stockés sur nos serveurs.", "name": "Ton pseudo", "theme": "🎨 Thème", "login": "Se connecter", "signup": "Créer un compte", "logout": "Se déconnecter", "f1": "Regarder ensemble des vidéos Dailymotion, YouTube, Twitch, Kick et Facebook", "f2": "Partage de fichier vidéo en direct", "f3": "Lecture, pause et avance synchronisées", "f4": "Chat, émojis et photos pendant le film", "f5": "Thème et fond d'écran partagés", "f6": "Sans serveur : le fichier passe directement entre vous", "create_h": "Créer une salle", "id_label": "Ton ID de salle", "devnote": "Fixe sur cet appareil. Ton ami a besoin de cet ID et du code ci-dessous.", "fixed_chk": "Garder toujours le même code", "fixed_lbl": "Ton code (6 lettres ou chiffres, modifiable)", "random": "Aléatoire", "create_btn": "Créer la salle", "join_h": "Rejoindre une salle", "join_id_lbl": "ID de la salle (9 chiffres)", "join_code_lbl": "Code d'accès (6 caractères)", "join_btn": "Rejoindre", "f_about": "À propos", "f_privacy": "Confidentialité", "f_terms": "Conditions", "f_contact": "Contact", "consent": "Ce site utilise des cookies et le stockage de ton navigateur pour fonctionner (préférences, session de salle). Si des publicités sont affichées, Google peut aussi utiliser des cookies pour les personnaliser.", "learn": "En savoir plus", "consent_ok": "J'ai compris", "err_name": "Choisis ton pseudo avant d'entrer dans la salle.", "au_home": "Accueil", "au_login_title": "Connectez-vous à votre compte", "au_signup_title": "Créez votre compte", "au_email": "E-mail", "au_pass": "Mot de passe", "au_show": "Afficher", "au_forgot": "Mot de passe oublié ?", "au_login_btn": "Connexion", "au_google": "Continuer avec Google", "au_to_signup": "Pas de compte ? Créez-en un", "au_have": "Vous avez déjà un compte ?", "au_login_link": "Connectez-vous !", "au_first": "Prénom", "au_last": "Nom", "au_pass_hint": "6 caractères minimum", "au_create": "Créer mon compte", "note": "Dans la salle, celui qui possède la vidéo la choisit. Pour un MP4, l'autre peut lancer la lecture après quelques secondes. Pour les autres formats, il faut attendre la fin du transfert. Gardez l'onglet ouvert.", "inv_pre": "Tu es invité dans la salle", "inv_own": "Créer ma propre salle", "legal_close": "Fermer", "r_copy": "Copier le lien", "r_wait": "En attente d'un ami…", "r_leave": "Quitter", "r_drop": "Il sera envoyé à ton ami, qui pourra le regarder pendant la réception. Si c'est lui qui l'a, attends qu'il le choisisse.", "r_pick": "Choisir un fichier vidéo", "r_ytdrop": "▶ Lire depuis une plateforme", "r_qtitle": "File d'attente", "r_qadd": "Ajouter des vidéos", "r_qclear": "Vider", "r_close": "Fermer", "r_tap": "Appuie pour lancer la lecture", "r_size": "Taille", "r_chat_hide": "Masquer le chat", "r_nov": "Aucune vidéo pour l'instant", "r_sync": "Synchroniser", "r_sync_tt": "Envoie ta position à tout le monde", "r_change": "Envoyer une vidéo", "r_yt": "▶ Lecture depuis plateformes", "r_theme": "🎨 Thème", "r_sub": "Sous-titres", "r_full": "Plein écran", "r_fit_contain": "Ajuster (tout voir)", "r_fit_cover": "Remplir (rogne les bords)", "r_fit_fill": "Étirer", "r_zoom": "Zoom", "r_chat": "Chat", "r_small": "Petit", "r_medium": "Moyen", "r_large": "Grand", "r_xlarge": "Très grand", "r_msg_ph": "Écrire un message…", "r_send": "Envoyer", "r_yt_title": "Lecture depuis plateformes", "r_choose_pf": "Choisis la plateforme", "r_back_pf": "← Autres plateformes", "r_go": "Lire pour tous", "r_stop": "Arrêter la lecture", "r_ytmsg": "YouTube : lecture, pause et avance sont synchronisées entre vous.", "r_url": "Lien de la vidéo", "scr_start": "🖥 Partager l'écran", "scr_stop": "⏹ Arrêter le partage", "scr_on": "Tu partages ton écran avec ton ami.", "scr_off": "Partage d'écran arrêté.", "scr_refused": "Partage d'écran annulé.", "scr_nosupport": "Le partage d'écran marche seulement sur ordinateur.", "src_file": "Fichier vidéo", "drop_title": "Choisis ta source", "r_url_spot": "Lien Spotify (titre, album ou playlist)", "pin_copy_id": "Copier l'ID", "pin_copy_code": "Copier le code", "sp_login": "Se connecter à Spotify", "sp_logged": "Connecté à Spotify : ", "sp_noid": "Connexion Spotify pas encore configurée.", "sp_fail": "La connexion Spotify a échoué. Réessaie.", "scr_label": "Partager l'écran", "scr_stop2": "Arrêter le partage", "sp_addr": "Adresse envoyée à Spotify : ", "sp_connecting": "Connexion en cours…", "sp_opened": "Spotify ouvert.", "sp_bad_link": "Ce lien n'est pas un lien Spotify (titre, album, playlist ou épisode).", "sp_logged_in": "Connecté à Spotify : ", "pf_yt_audio": "YouTube audio seul", "yt_audio_t": "Mode audio seul", "yt_audio_s": "La vidéo est masquée. Le son continue.", "yt_audio_play": "▶ Lire", "yt_audio_pause": "⏸ Pause", "yt_audio_change": "Choisir une autre vidéo ou playlist", "yt_audio_opt": "Audio seul (masquer la vidéo)", "multi_label": "Multi-vidéo", "multi_title": "Multi-vidéo (YouTube ou Twitch)", "multi_top": "Vidéo du haut (lien)", "multi_bottom": "Vidéo du bas (lien)", "multi_go": "Lancer", "multi_cancel": "Annuler", "multi_bad": "Les deux liens doivent être YouTube ou les deux Twitch, et valides.", "multi_opened": "Multi-vidéo ouverte. Les deux vidéos sont synchronisées.", "multi_fit_all": "Tout voir", "multi_fit_fill": "Remplir l'écran", "multi_manual": "La vidéo du bas ne démarre pas toute seule : appuie sur son bouton lecture.", "mv_stuck": "Une des deux vidéos ne répond pas. Clique une fois dedans pour l'activer.", "how_h": "Comment ça marche", "how_1": "Crée une salle, ou rejoins celle de ton ami avec son ID et son code.", "how_2": "Choisis une vidéo : un lien YouTube, Dailymotion, Twitch, Kick ou Facebook, ou un fichier de ton appareil.", "how_3": "Regardez ensemble : lecture, pause et position restent synchronisées, et vous pouvez discuter dans le chat.", "how_4": "Un compte n'est pas obligatoire."}, "en": {"lede": "Watch a video together, at the same time, even from a distance. Choose a public video (YouTube, Dailymotion, Twitch, Kick, Facebook) or a file you own: play, pause and position are synced, with a chat on the side. Files go directly between you, without being stored on our servers.", "name": "Your nickname", "theme": "🎨 Theme", "login": "Log in", "signup": "Create account", "logout": "Log out", "f1": "Watch Dailymotion, YouTube, Twitch, Kick and Facebook videos together", "f2": "Live video file sharing", "f3": "Synced play, pause and seek", "f4": "Chat, emojis and photos during the movie", "f5": "Shared theme and wallpaper", "f6": "No server: the file goes directly between you", "create_h": "Create a room", "id_label": "Your room ID", "devnote": "Fixed to this device. Your friend needs this ID and the code below.", "fixed_chk": "Always keep the same code", "fixed_lbl": "Your code (6 letters or digits, editable)", "random": "Random", "create_btn": "Create room", "join_h": "Join a room", "join_id_lbl": "Room ID (9 digits)", "join_code_lbl": "Access code (6 characters)", "join_btn": "Join", "f_about": "About", "f_privacy": "Privacy", "f_terms": "Terms", "f_contact": "Contact", "consent": "This site uses cookies and your browser storage to work (preferences, room session). If ads are shown, Google may also use cookies to personalize them.", "learn": "Learn more", "consent_ok": "Got it", "err_name": "Choose your nickname before entering the room.", "au_home": "Home", "au_login_title": "Log in to your account", "au_signup_title": "Create your account", "au_email": "Email", "au_pass": "Password", "au_show": "Show", "au_forgot": "Forgot password?", "au_login_btn": "Log in", "au_google": "Continue with Google", "au_to_signup": "No account? Create one", "au_have": "Already have an account?", "au_login_link": "Log in!", "au_first": "First name", "au_last": "Last name", "au_pass_hint": "At least 6 characters", "au_create": "Create my account", "note": "In the room, whoever has the video chooses it. For an MP4, the other can start playback after a few seconds. For other formats, you have to wait until the transfer finishes. Keep the tab open.", "inv_pre": "You are invited to room", "inv_own": "Create my own room", "legal_close": "Close", "r_copy": "Copy link", "r_wait": "Waiting for a friend…", "r_leave": "Leave", "r_drop": "It will be sent to your friend, who can watch it while it arrives. If they have it, wait for them to choose it.", "r_pick": "Choose a video file", "r_ytdrop": "▶ Play from a platform", "r_qtitle": "Queue", "r_qadd": "Add videos", "r_qclear": "Clear", "r_close": "Close", "r_tap": "Tap to start playback", "r_size": "Size", "r_chat_hide": "Hide chat", "r_nov": "No video yet", "r_sync": "Sync", "r_sync_tt": "Send your position to everyone", "r_change": "Send a video", "r_yt": "▶ Play from platforms", "r_theme": "🎨 Theme", "r_sub": "Subtitles", "r_full": "Fullscreen", "r_fit_contain": "Fit (show all)", "r_fit_cover": "Fill (crop edges)", "r_fit_fill": "Stretch", "r_zoom": "Zoom", "r_chat": "Chat", "r_small": "Small", "r_medium": "Medium", "r_large": "Large", "r_xlarge": "Extra large", "r_msg_ph": "Write a message…", "r_send": "Send", "r_yt_title": "Play from platforms", "r_choose_pf": "Choose the platform", "r_back_pf": "← Other platforms", "r_go": "Play for everyone", "r_stop": "Stop playback", "r_ytmsg": "YouTube: play, pause and seek are synced between you.", "r_url": "Video link", "scr_start": "🖥 Share screen", "scr_stop": "⏹ Stop sharing", "scr_on": "You are sharing your screen with your friend.", "scr_off": "Screen sharing stopped.", "scr_refused": "Screen sharing cancelled.", "scr_nosupport": "Screen sharing only works on a computer.", "src_file": "Video file", "drop_title": "Choose your source", "r_url_spot": "Spotify link (track, album or playlist)", "pin_copy_id": "Copy ID", "pin_copy_code": "Copy code", "sp_login": "Log in to Spotify", "sp_logged": "Logged in to Spotify: ", "sp_noid": "Spotify login is not configured yet.", "sp_fail": "Spotify login failed. Try again.", "scr_label": "Share screen", "scr_stop2": "Stop sharing", "sp_addr": "Address sent to Spotify: ", "sp_connecting": "Connecting…", "sp_opened": "Spotify opened.", "sp_bad_link": "This is not a Spotify link (track, album, playlist or episode).", "sp_logged_in": "Logged in to Spotify: ", "pf_yt_audio": "YouTube audio only", "yt_audio_t": "Audio-only mode", "yt_audio_s": "The video is hidden. The sound keeps playing.", "yt_audio_play": "▶ Play", "yt_audio_pause": "⏸ Pause", "yt_audio_change": "Choose another video or playlist", "yt_audio_opt": "Audio only (hide the video)", "multi_label": "Multi-video", "multi_title": "Multi-video (YouTube or Twitch)", "multi_top": "Top video (link)", "multi_bottom": "Bottom video (link)", "multi_go": "Start", "multi_cancel": "Cancel", "multi_bad": "Both links must be YouTube, or both Twitch, and valid.", "multi_opened": "Multi-video opened. Both videos are synced.", "multi_fit_all": "Show all", "multi_fit_fill": "Fill screen", "multi_manual": "The bottom video did not start by itself: press its play button.", "mv_stuck": "One of the two videos is not responding. Click inside it once to activate it.", "how_h": "How it works", "how_1": "Create a room, or join your friend's room with their ID and code.", "how_2": "Pick a video: a YouTube, Dailymotion, Twitch, Kick or Facebook link, or a file from your device.", "how_3": "Watch together: play, pause and position stay in sync, and you can chat as you watch.", "how_4": "An account is optional."}, "ar": {"lede": "شاهدوا فيديو معاً في نفس الوقت، حتى من مسافات بعيدة. اختاروا فيديو عاماً (YouTube وDailymotion وTwitch وKick وFacebook) أو ملفاً تملكونه: التشغيل والإيقاف والموضع متزامنة، مع دردشة جانبية. تنتقل الملفات مباشرة بينكم دون تخزينها على خوادمنا.", "name": "اسمك المستعار", "theme": "🎨 المظهر", "login": "تسجيل الدخول", "signup": "إنشاء حساب", "logout": "تسجيل الخروج", "f1": "شاهدوا فيديوهات Dailymotion وYouTube وTwitch وKick وFacebook معاً", "f2": "مشاركة ملف الفيديو مباشرة", "f3": "تزامن التشغيل والإيقاف والتقديم", "f4": "دردشة وإيموجي وصور أثناء الفيلم", "f5": "مظهر وخلفية مشتركان", "f6": "بدون خادم: الملف ينتقل مباشرة بينكم", "create_h": "إنشاء غرفة", "id_label": "معرّف غرفتك", "devnote": "ثابت على هذا الجهاز. يحتاج صديقك إلى هذا المعرّف والرمز أدناه.", "fixed_chk": "الاحتفاظ دائماً بالرمز نفسه", "fixed_lbl": "رمزك (6 أحرف أو أرقام، قابل للتعديل)", "random": "عشوائي", "create_btn": "إنشاء الغرفة", "join_h": "الانضمام إلى غرفة", "join_id_lbl": "معرّف الغرفة (9 أرقام)", "join_code_lbl": "رمز الدخول (6 أحرف)", "join_btn": "انضمام", "f_about": "حول الموقع", "f_privacy": "الخصوصية", "f_terms": "الشروط", "f_contact": "اتصل بنا", "consent": "يستخدم هذا الموقع ملفات تعريف الارتباط وتخزين المتصفح ليعمل (التفضيلات، جلسة الغرفة). وإذا ظهرت إعلانات، فقد تستخدم Google ملفات تعريف الارتباط لتخصيصها.", "learn": "اعرف المزيد", "consent_ok": "فهمت", "err_name": "اختر اسمك المستعار قبل الدخول إلى الغرفة.", "au_home": "الرئيسية", "au_login_title": "سجّل الدخول إلى حسابك", "au_signup_title": "أنشئ حسابك", "au_email": "البريد الإلكتروني", "au_pass": "كلمة المرور", "au_show": "إظهار", "au_forgot": "نسيت كلمة المرور؟", "au_login_btn": "تسجيل الدخول", "au_google": "المتابعة باستخدام Google", "au_to_signup": "ليس لديك حساب؟ أنشئ حساباً", "au_have": "لديك حساب بالفعل؟", "au_login_link": "سجّل الدخول!", "au_first": "الاسم الأول", "au_last": "اسم العائلة", "au_pass_hint": "6 أحرف على الأقل", "au_create": "إنشاء حسابي", "note": "داخل الغرفة، من يملك الفيديو هو من يختاره. بالنسبة لملفات MP4 يمكن للطرف الآخر بدء التشغيل بعد ثوانٍ قليلة. أما الصيغ الأخرى فيجب انتظار انتهاء النقل. أبقِ الصفحة مفتوحة.", "inv_pre": "أنت مدعو إلى الغرفة", "inv_own": "أنشئ غرفتي الخاصة", "legal_close": "إغلاق", "r_copy": "نسخ الرابط", "r_wait": "بانتظار صديق…", "r_leave": "مغادرة", "r_drop": "سيُرسل إلى صديقك، الذي يمكنه مشاهدته أثناء الاستقبال. إذا كان هو من يملكه، فانتظر أن يختاره.", "r_pick": "اختر ملف فيديو", "r_ytdrop": "▶ التشغيل من منصة", "r_qtitle": "قائمة الانتظار", "r_qadd": "إضافة فيديوهات", "r_qclear": "تفريغ", "r_close": "إغلاق", "r_tap": "اضغط لبدء التشغيل", "r_size": "الحجم", "r_chat_hide": "إخفاء الدردشة", "r_nov": "لا يوجد فيديو بعد", "r_sync": "مزامنة", "r_sync_tt": "أرسل موضعك للجميع", "r_change": "إرسال فيديو", "r_yt": "▶ التشغيل من المنصات", "r_theme": "🎨 المظهر", "r_sub": "الترجمة", "r_full": "ملء الشاشة", "r_fit_contain": "ملاءمة (عرض الكل)", "r_fit_cover": "ملء (قص الحواف)", "r_fit_fill": "تمديد", "r_zoom": "تكبير", "r_chat": "الدردشة", "r_small": "صغير", "r_medium": "متوسط", "r_large": "كبير", "r_xlarge": "كبير جداً", "r_msg_ph": "اكتب رسالة…", "r_send": "إرسال", "r_yt_title": "التشغيل من المنصات", "r_choose_pf": "اختر المنصة", "r_back_pf": "منصات أخرى →", "r_go": "تشغيل للجميع", "r_stop": "إيقاف التشغيل", "r_ytmsg": "يوتيوب: التشغيل والإيقاف والتقديم متزامنة بينكم.", "r_url": "رابط الفيديو", "scr_start": "🖥 مشاركة الشاشة", "scr_stop": "⏹ إيقاف المشاركة", "scr_on": "أنت تشارك شاشتك مع صديقك.", "scr_off": "تم إيقاف مشاركة الشاشة.", "scr_refused": "تم إلغاء مشاركة الشاشة.", "scr_nosupport": "مشاركة الشاشة متاحة فقط على الحاسوب.", "src_file": "ملف فيديو", "drop_title": "اختر مصدر الفيديو", "r_url_spot": "رابط Spotify (مقطع أو ألبوم أو قائمة)", "pin_copy_id": "نسخ المعرّف", "pin_copy_code": "نسخ الرمز", "sp_login": "تسجيل الدخول إلى Spotify", "sp_logged": "متصل بـ Spotify: ", "sp_noid": "تسجيل الدخول إلى Spotify غير مُعد بعد.", "sp_fail": "فشل تسجيل الدخول إلى Spotify. حاول مرة أخرى.", "scr_label": "مشاركة الشاشة", "scr_stop2": "إيقاف المشاركة", "sp_addr": "العنوان المُرسل إلى Spotify: ", "sp_connecting": "جارٍ الاتصال…", "sp_opened": "تم فتح Spotify.", "sp_bad_link": "هذا ليس رابط Spotify (مقطع أو ألبوم أو قائمة أو حلقة).", "sp_logged_in": "متصل بـ Spotify: ", "pf_yt_audio": "YouTube صوت فقط", "yt_audio_t": "وضع الصوت فقط", "yt_audio_s": "الفيديو مخفي والصوت مستمر.", "yt_audio_play": "▶ تشغيل", "yt_audio_pause": "⏸ إيقاف مؤقت", "yt_audio_change": "اختيار فيديو أو قائمة أخرى", "yt_audio_opt": "صوت فقط (إخفاء الفيديو)", "multi_label": "فيديو متعدد", "multi_title": "فيديو متعدد (YouTube أو Twitch)", "multi_top": "الفيديو العلوي (رابط)", "multi_bottom": "الفيديو السفلي (رابط)", "multi_go": "ابدأ", "multi_cancel": "إلغاء", "multi_bad": "يجب أن يكون الرابطان من YouTube معاً أو من Twitch معاً، وصالحين.", "multi_opened": "تم فتح الفيديو المتعدد. الفيديوهان متزامنان.", "multi_fit_all": "عرض الكل", "multi_fit_fill": "ملء الشاشة", "multi_manual": "لم يبدأ الفيديو السفلي تلقائياً: اضغط على زر التشغيل الخاص به.", "mv_stuck": "إحدى الفيديوهين لا تستجيب. اضغط داخلها مرة واحدة لتفعيلها.", "how_h": "كيف يعمل", "how_1": "أنشئ غرفة، أو انضم إلى غرفة صديقك بمعرّفها ورمزها.", "how_2": "اختر فيديو: رابطاً من YouTube أو Dailymotion أو Twitch أو Kick أو Facebook، أو ملفاً من جهازك.", "how_3": "شاهدا معاً: التشغيل والإيقاف والموضع تبقى متزامنة، ويمكنكما الدردشة أثناء المشاهدة.", "how_4": "الحساب اختياري."}};
+  var I18N = {"fr": {"lede": "Regardez une vidéo à deux, en même temps, même à distance. Choisissez une vidéo publique (YouTube, Dailymotion, Twitch, Kick, Facebook) ou un fichier que vous possédez : la lecture, la pause et la position sont synchronisées, avec un chat à côté. Les fichiers passent directement entre vous, sans être stockés sur nos serveurs.", "name": "Ton pseudo", "theme": "🎨 Thème", "login": "Se connecter", "signup": "Créer un compte", "logout": "Se déconnecter", "f1": "Regarder ensemble des vidéos Dailymotion, YouTube, Twitch, Kick et Facebook", "f2": "Partage de fichier vidéo en direct", "f3": "Lecture, pause et avance synchronisées", "f4": "Chat, émojis et photos pendant le film", "f5": "Thème et fond d'écran partagés", "f6": "Sans serveur : le fichier passe directement entre vous", "create_h": "Créer une salle", "id_label": "Ton ID de salle", "devnote": "Fixe sur cet appareil. Ton ami a besoin de cet ID et du code ci-dessous.", "fixed_chk": "Garder toujours le même code", "fixed_lbl": "Ton code (6 lettres ou chiffres, modifiable)", "random": "Aléatoire", "create_btn": "Créer la salle", "join_h": "Rejoindre une salle", "join_id_lbl": "ID de la salle (9 chiffres)", "join_code_lbl": "Code d'accès (6 caractères)", "join_btn": "Rejoindre", "f_about": "À propos", "f_privacy": "Confidentialité", "f_terms": "Conditions", "f_contact": "Contact", "consent": "Ce site utilise des cookies et le stockage de ton navigateur pour fonctionner (préférences, session de salle). Si des publicités sont affichées, Google peut aussi utiliser des cookies pour les personnaliser.", "learn": "En savoir plus", "consent_ok": "J'ai compris", "err_name": "Choisis ton pseudo avant d'entrer dans la salle.", "au_home": "Accueil", "au_login_title": "Connectez-vous à votre compte", "au_signup_title": "Créez votre compte", "au_email": "E-mail", "au_pass": "Mot de passe", "au_show": "Afficher", "au_forgot": "Mot de passe oublié ?", "au_login_btn": "Connexion", "au_google": "Continuer avec Google", "au_to_signup": "Pas de compte ? Créez-en un", "au_have": "Vous avez déjà un compte ?", "au_login_link": "Connectez-vous !", "au_first": "Prénom", "au_last": "Nom", "au_pass_hint": "6 caractères minimum", "au_create": "Créer mon compte", "note": "Dans la salle, celui qui possède la vidéo la choisit. Pour un MP4, l'autre peut lancer la lecture après quelques secondes. Pour les autres formats, il faut attendre la fin du transfert. Gardez l'onglet ouvert.", "inv_pre": "Tu es invité dans la salle", "inv_own": "Créer ma propre salle", "legal_close": "Fermer", "r_copy": "Copier le lien", "r_wait": "En attente d'un ami…", "r_leave": "Quitter", "r_drop": "Il sera envoyé à ton ami, qui pourra le regarder pendant la réception. Si c'est lui qui l'a, attends qu'il le choisisse.", "r_pick": "Choisir un fichier vidéo", "r_ytdrop": "▶ Lire depuis une plateforme", "r_qtitle": "File d'attente", "r_qadd": "Ajouter des vidéos", "r_qclear": "Vider", "r_close": "Fermer", "r_tap": "Appuie pour lancer la lecture", "r_size": "Taille", "r_chat_hide": "Masquer le chat", "r_nov": "Aucune vidéo pour l'instant", "r_sync": "Synchroniser", "r_sync_tt": "Envoie ta position à tout le monde", "r_change": "Envoyer une vidéo", "r_yt": "▶ Lecture depuis plateformes", "r_theme": "🎨 Thème", "r_sub": "Sous-titres", "r_full": "Plein écran", "r_fit_contain": "Ajuster (tout voir)", "r_fit_cover": "Remplir (rogne les bords)", "r_fit_fill": "Étirer", "r_zoom": "Zoom", "r_chat": "Chat", "r_small": "Petit", "r_medium": "Moyen", "r_large": "Grand", "r_xlarge": "Très grand", "r_msg_ph": "Écrire un message…", "r_send": "Envoyer", "r_yt_title": "Lecture depuis plateformes", "r_choose_pf": "Choisis la plateforme", "r_back_pf": "← Autres plateformes", "r_go": "Lire pour tous", "r_stop": "Arrêter la lecture", "r_ytmsg": "YouTube : lecture, pause et avance sont synchronisées entre vous.", "r_url": "Lien de la vidéo", "scr_start": "🖥 Partager l'écran", "scr_stop": "⏹ Arrêter le partage", "scr_on": "Tu partages ton écran avec ton ami.", "scr_off": "Partage d'écran arrêté.", "scr_refused": "Partage d'écran annulé.", "scr_nosupport": "Le partage d'écran marche seulement sur ordinateur.", "src_file": "Fichier vidéo", "drop_title": "Choisis ta source", "r_url_spot": "Lien Spotify (titre, album ou playlist)", "pin_copy_id": "Copier l'ID", "pin_copy_code": "Copier le code", "sp_login": "Se connecter à Spotify", "sp_logged": "Connecté à Spotify : ", "sp_noid": "Connexion Spotify pas encore configurée.", "sp_fail": "La connexion Spotify a échoué. Réessaie.", "scr_label": "Partager l'écran", "scr_stop2": "Arrêter le partage", "sp_addr": "Adresse envoyée à Spotify : ", "sp_connecting": "Connexion en cours…", "sp_opened": "Spotify ouvert.", "sp_bad_link": "Ce lien n'est pas un lien Spotify (titre, album, playlist ou épisode).", "sp_logged_in": "Connecté à Spotify : ", "pf_yt_audio": "YouTube audio seul", "yt_audio_t": "Mode audio seul", "yt_audio_s": "La vidéo est masquée. Le son continue.", "yt_audio_play": "▶ Lire", "yt_audio_pause": "⏸ Pause", "yt_audio_change": "Choisir une autre vidéo ou playlist", "yt_audio_opt": "Audio seul (masquer la vidéo)", "multi_label": "Multi-vidéo", "multi_title": "Multi-vidéo (YouTube ou Twitch)", "multi_top": "Vidéo du haut (lien)", "multi_bottom": "Vidéo du bas (lien)", "multi_go": "Lancer", "multi_cancel": "Annuler", "multi_bad": "Les deux liens doivent être YouTube ou les deux Twitch, et valides.", "multi_opened": "Multi-vidéo ouverte. Les deux vidéos sont synchronisées.", "multi_fit_all": "Tout voir", "multi_fit_fill": "Remplir l'écran", "multi_manual": "La vidéo du bas ne démarre pas toute seule : appuie sur son bouton lecture.", "mv_stuck": "Une des deux vidéos ne répond pas. Clique une fois dedans pour l'activer.", "how_h": "Comment ça marche", "how_1": "Crée une salle, ou rejoins celle de ton ami avec son ID et son code.", "how_2": "Choisis une vidéo : un lien YouTube, Dailymotion, Twitch, Kick ou Facebook, ou un fichier de ton appareil.", "how_3": "Regardez ensemble : lecture, pause et position restent synchronisées, et vous pouvez discuter dans le chat.", "how_4": "Un compte n'est pas obligatoire.", "q_link_ph": "Lien YouTube, Dailymotion, Twitch, Kick ou Facebook", "q_link_add": "Ajouter le lien", "hist_h": "Salles récentes"}, "en": {"lede": "Watch a video together, at the same time, even from a distance. Choose a public video (YouTube, Dailymotion, Twitch, Kick, Facebook) or a file you own: play, pause and position are synced, with a chat on the side. Files go directly between you, without being stored on our servers.", "name": "Your nickname", "theme": "🎨 Theme", "login": "Log in", "signup": "Create account", "logout": "Log out", "f1": "Watch Dailymotion, YouTube, Twitch, Kick and Facebook videos together", "f2": "Live video file sharing", "f3": "Synced play, pause and seek", "f4": "Chat, emojis and photos during the movie", "f5": "Shared theme and wallpaper", "f6": "No server: the file goes directly between you", "create_h": "Create a room", "id_label": "Your room ID", "devnote": "Fixed to this device. Your friend needs this ID and the code below.", "fixed_chk": "Always keep the same code", "fixed_lbl": "Your code (6 letters or digits, editable)", "random": "Random", "create_btn": "Create room", "join_h": "Join a room", "join_id_lbl": "Room ID (9 digits)", "join_code_lbl": "Access code (6 characters)", "join_btn": "Join", "f_about": "About", "f_privacy": "Privacy", "f_terms": "Terms", "f_contact": "Contact", "consent": "This site uses cookies and your browser storage to work (preferences, room session). If ads are shown, Google may also use cookies to personalize them.", "learn": "Learn more", "consent_ok": "Got it", "err_name": "Choose your nickname before entering the room.", "au_home": "Home", "au_login_title": "Log in to your account", "au_signup_title": "Create your account", "au_email": "Email", "au_pass": "Password", "au_show": "Show", "au_forgot": "Forgot password?", "au_login_btn": "Log in", "au_google": "Continue with Google", "au_to_signup": "No account? Create one", "au_have": "Already have an account?", "au_login_link": "Log in!", "au_first": "First name", "au_last": "Last name", "au_pass_hint": "At least 6 characters", "au_create": "Create my account", "note": "In the room, whoever has the video chooses it. For an MP4, the other can start playback after a few seconds. For other formats, you have to wait until the transfer finishes. Keep the tab open.", "inv_pre": "You are invited to room", "inv_own": "Create my own room", "legal_close": "Close", "r_copy": "Copy link", "r_wait": "Waiting for a friend…", "r_leave": "Leave", "r_drop": "It will be sent to your friend, who can watch it while it arrives. If they have it, wait for them to choose it.", "r_pick": "Choose a video file", "r_ytdrop": "▶ Play from a platform", "r_qtitle": "Queue", "r_qadd": "Add videos", "r_qclear": "Clear", "r_close": "Close", "r_tap": "Tap to start playback", "r_size": "Size", "r_chat_hide": "Hide chat", "r_nov": "No video yet", "r_sync": "Sync", "r_sync_tt": "Send your position to everyone", "r_change": "Send a video", "r_yt": "▶ Play from platforms", "r_theme": "🎨 Theme", "r_sub": "Subtitles", "r_full": "Fullscreen", "r_fit_contain": "Fit (show all)", "r_fit_cover": "Fill (crop edges)", "r_fit_fill": "Stretch", "r_zoom": "Zoom", "r_chat": "Chat", "r_small": "Small", "r_medium": "Medium", "r_large": "Large", "r_xlarge": "Extra large", "r_msg_ph": "Write a message…", "r_send": "Send", "r_yt_title": "Play from platforms", "r_choose_pf": "Choose the platform", "r_back_pf": "← Other platforms", "r_go": "Play for everyone", "r_stop": "Stop playback", "r_ytmsg": "YouTube: play, pause and seek are synced between you.", "r_url": "Video link", "scr_start": "🖥 Share screen", "scr_stop": "⏹ Stop sharing", "scr_on": "You are sharing your screen with your friend.", "scr_off": "Screen sharing stopped.", "scr_refused": "Screen sharing cancelled.", "scr_nosupport": "Screen sharing only works on a computer.", "src_file": "Video file", "drop_title": "Choose your source", "r_url_spot": "Spotify link (track, album or playlist)", "pin_copy_id": "Copy ID", "pin_copy_code": "Copy code", "sp_login": "Log in to Spotify", "sp_logged": "Logged in to Spotify: ", "sp_noid": "Spotify login is not configured yet.", "sp_fail": "Spotify login failed. Try again.", "scr_label": "Share screen", "scr_stop2": "Stop sharing", "sp_addr": "Address sent to Spotify: ", "sp_connecting": "Connecting…", "sp_opened": "Spotify opened.", "sp_bad_link": "This is not a Spotify link (track, album, playlist or episode).", "sp_logged_in": "Logged in to Spotify: ", "pf_yt_audio": "YouTube audio only", "yt_audio_t": "Audio-only mode", "yt_audio_s": "The video is hidden. The sound keeps playing.", "yt_audio_play": "▶ Play", "yt_audio_pause": "⏸ Pause", "yt_audio_change": "Choose another video or playlist", "yt_audio_opt": "Audio only (hide the video)", "multi_label": "Multi-video", "multi_title": "Multi-video (YouTube or Twitch)", "multi_top": "Top video (link)", "multi_bottom": "Bottom video (link)", "multi_go": "Start", "multi_cancel": "Cancel", "multi_bad": "Both links must be YouTube, or both Twitch, and valid.", "multi_opened": "Multi-video opened. Both videos are synced.", "multi_fit_all": "Show all", "multi_fit_fill": "Fill screen", "multi_manual": "The bottom video did not start by itself: press its play button.", "mv_stuck": "One of the two videos is not responding. Click inside it once to activate it.", "how_h": "How it works", "how_1": "Create a room, or join your friend's room with their ID and code.", "how_2": "Pick a video: a YouTube, Dailymotion, Twitch, Kick or Facebook link, or a file from your device.", "how_3": "Watch together: play, pause and position stay in sync, and you can chat as you watch.", "how_4": "An account is optional.", "q_link_ph": "YouTube, Dailymotion, Twitch, Kick or Facebook link", "q_link_add": "Add link", "hist_h": "Recent rooms"}, "ar": {"lede": "شاهدوا فيديو معاً في نفس الوقت، حتى من مسافات بعيدة. اختاروا فيديو عاماً (YouTube وDailymotion وTwitch وKick وFacebook) أو ملفاً تملكونه: التشغيل والإيقاف والموضع متزامنة، مع دردشة جانبية. تنتقل الملفات مباشرة بينكم دون تخزينها على خوادمنا.", "name": "اسمك المستعار", "theme": "🎨 المظهر", "login": "تسجيل الدخول", "signup": "إنشاء حساب", "logout": "تسجيل الخروج", "f1": "شاهدوا فيديوهات Dailymotion وYouTube وTwitch وKick وFacebook معاً", "f2": "مشاركة ملف الفيديو مباشرة", "f3": "تزامن التشغيل والإيقاف والتقديم", "f4": "دردشة وإيموجي وصور أثناء الفيلم", "f5": "مظهر وخلفية مشتركان", "f6": "بدون خادم: الملف ينتقل مباشرة بينكم", "create_h": "إنشاء غرفة", "id_label": "معرّف غرفتك", "devnote": "ثابت على هذا الجهاز. يحتاج صديقك إلى هذا المعرّف والرمز أدناه.", "fixed_chk": "الاحتفاظ دائماً بالرمز نفسه", "fixed_lbl": "رمزك (6 أحرف أو أرقام، قابل للتعديل)", "random": "عشوائي", "create_btn": "إنشاء الغرفة", "join_h": "الانضمام إلى غرفة", "join_id_lbl": "معرّف الغرفة (9 أرقام)", "join_code_lbl": "رمز الدخول (6 أحرف)", "join_btn": "انضمام", "f_about": "حول الموقع", "f_privacy": "الخصوصية", "f_terms": "الشروط", "f_contact": "اتصل بنا", "consent": "يستخدم هذا الموقع ملفات تعريف الارتباط وتخزين المتصفح ليعمل (التفضيلات، جلسة الغرفة). وإذا ظهرت إعلانات، فقد تستخدم Google ملفات تعريف الارتباط لتخصيصها.", "learn": "اعرف المزيد", "consent_ok": "فهمت", "err_name": "اختر اسمك المستعار قبل الدخول إلى الغرفة.", "au_home": "الرئيسية", "au_login_title": "سجّل الدخول إلى حسابك", "au_signup_title": "أنشئ حسابك", "au_email": "البريد الإلكتروني", "au_pass": "كلمة المرور", "au_show": "إظهار", "au_forgot": "نسيت كلمة المرور؟", "au_login_btn": "تسجيل الدخول", "au_google": "المتابعة باستخدام Google", "au_to_signup": "ليس لديك حساب؟ أنشئ حساباً", "au_have": "لديك حساب بالفعل؟", "au_login_link": "سجّل الدخول!", "au_first": "الاسم الأول", "au_last": "اسم العائلة", "au_pass_hint": "6 أحرف على الأقل", "au_create": "إنشاء حسابي", "note": "داخل الغرفة، من يملك الفيديو هو من يختاره. بالنسبة لملفات MP4 يمكن للطرف الآخر بدء التشغيل بعد ثوانٍ قليلة. أما الصيغ الأخرى فيجب انتظار انتهاء النقل. أبقِ الصفحة مفتوحة.", "inv_pre": "أنت مدعو إلى الغرفة", "inv_own": "أنشئ غرفتي الخاصة", "legal_close": "إغلاق", "r_copy": "نسخ الرابط", "r_wait": "بانتظار صديق…", "r_leave": "مغادرة", "r_drop": "سيُرسل إلى صديقك، الذي يمكنه مشاهدته أثناء الاستقبال. إذا كان هو من يملكه، فانتظر أن يختاره.", "r_pick": "اختر ملف فيديو", "r_ytdrop": "▶ التشغيل من منصة", "r_qtitle": "قائمة الانتظار", "r_qadd": "إضافة فيديوهات", "r_qclear": "تفريغ", "r_close": "إغلاق", "r_tap": "اضغط لبدء التشغيل", "r_size": "الحجم", "r_chat_hide": "إخفاء الدردشة", "r_nov": "لا يوجد فيديو بعد", "r_sync": "مزامنة", "r_sync_tt": "أرسل موضعك للجميع", "r_change": "إرسال فيديو", "r_yt": "▶ التشغيل من المنصات", "r_theme": "🎨 المظهر", "r_sub": "الترجمة", "r_full": "ملء الشاشة", "r_fit_contain": "ملاءمة (عرض الكل)", "r_fit_cover": "ملء (قص الحواف)", "r_fit_fill": "تمديد", "r_zoom": "تكبير", "r_chat": "الدردشة", "r_small": "صغير", "r_medium": "متوسط", "r_large": "كبير", "r_xlarge": "كبير جداً", "r_msg_ph": "اكتب رسالة…", "r_send": "إرسال", "r_yt_title": "التشغيل من المنصات", "r_choose_pf": "اختر المنصة", "r_back_pf": "منصات أخرى →", "r_go": "تشغيل للجميع", "r_stop": "إيقاف التشغيل", "r_ytmsg": "يوتيوب: التشغيل والإيقاف والتقديم متزامنة بينكم.", "r_url": "رابط الفيديو", "scr_start": "🖥 مشاركة الشاشة", "scr_stop": "⏹ إيقاف المشاركة", "scr_on": "أنت تشارك شاشتك مع صديقك.", "scr_off": "تم إيقاف مشاركة الشاشة.", "scr_refused": "تم إلغاء مشاركة الشاشة.", "scr_nosupport": "مشاركة الشاشة متاحة فقط على الحاسوب.", "src_file": "ملف فيديو", "drop_title": "اختر مصدر الفيديو", "r_url_spot": "رابط Spotify (مقطع أو ألبوم أو قائمة)", "pin_copy_id": "نسخ المعرّف", "pin_copy_code": "نسخ الرمز", "sp_login": "تسجيل الدخول إلى Spotify", "sp_logged": "متصل بـ Spotify: ", "sp_noid": "تسجيل الدخول إلى Spotify غير مُعد بعد.", "sp_fail": "فشل تسجيل الدخول إلى Spotify. حاول مرة أخرى.", "scr_label": "مشاركة الشاشة", "scr_stop2": "إيقاف المشاركة", "sp_addr": "العنوان المُرسل إلى Spotify: ", "sp_connecting": "جارٍ الاتصال…", "sp_opened": "تم فتح Spotify.", "sp_bad_link": "هذا ليس رابط Spotify (مقطع أو ألبوم أو قائمة أو حلقة).", "sp_logged_in": "متصل بـ Spotify: ", "pf_yt_audio": "YouTube صوت فقط", "yt_audio_t": "وضع الصوت فقط", "yt_audio_s": "الفيديو مخفي والصوت مستمر.", "yt_audio_play": "▶ تشغيل", "yt_audio_pause": "⏸ إيقاف مؤقت", "yt_audio_change": "اختيار فيديو أو قائمة أخرى", "yt_audio_opt": "صوت فقط (إخفاء الفيديو)", "multi_label": "فيديو متعدد", "multi_title": "فيديو متعدد (YouTube أو Twitch)", "multi_top": "الفيديو العلوي (رابط)", "multi_bottom": "الفيديو السفلي (رابط)", "multi_go": "ابدأ", "multi_cancel": "إلغاء", "multi_bad": "يجب أن يكون الرابطان من YouTube معاً أو من Twitch معاً، وصالحين.", "multi_opened": "تم فتح الفيديو المتعدد. الفيديوهان متزامنان.", "multi_fit_all": "عرض الكل", "multi_fit_fill": "ملء الشاشة", "multi_manual": "لم يبدأ الفيديو السفلي تلقائياً: اضغط على زر التشغيل الخاص به.", "mv_stuck": "إحدى الفيديوهين لا تستجيب. اضغط داخلها مرة واحدة لتفعيلها.", "how_h": "كيف يعمل", "how_1": "أنشئ غرفة، أو انضم إلى غرفة صديقك بمعرّفها ورمزها.", "how_2": "اختر فيديو: رابطاً من YouTube أو Dailymotion أو Twitch أو Kick أو Facebook، أو ملفاً من جهازك.", "how_3": "شاهدا معاً: التشغيل والإيقاف والموضع تبقى متزامنة، ويمكنكما الدردشة أثناء المشاهدة.", "how_4": "الحساب اختياري.", "q_link_ph": "رابط YouTube أو Dailymotion أو Twitch أو Kick أو Facebook", "q_link_add": "أضف الرابط", "hist_h": "الغرف الأخيرة"}};
   var LANG_NAMES = { fr: 'Français', en: 'English', ar: 'العربية' };
   function pickLang() {
     var s = ''; try { s = localStorage.getItem('a2g-lang') || ''; } catch (e) {}
