@@ -34,6 +34,14 @@
   var switchingUntil = 0, subsText = '', applyingUntil = 0, pendingState = null, toastTimer = null, wakeLock = null;
   var lastUserInput = 0, pointerDown = false, pseudoFs = false;
   var lastErrAt = 0;
+  // identité de jeu stable pour cet appareil (ne change pas quand la page est rechargée)
+  var gameId = (function () {
+    try {
+      var k = localStorage.getItem('a2g-gid');
+      if (!k) { k = Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem('a2g-gid', k); }
+      return k;
+    } catch (e) { return Math.random().toString(36).slice(2, 10); }
+  })();
   var myCid = (function () {                 // identifiant propre à cet onglet : une reconnexion remplace l'ancienne connexion
     try { var k = sessionStorage.getItem('samaraf-cid'); if (!k) { k = Math.random().toString(36).slice(2, 10); sessionStorage.setItem('samaraf-cid', k); } return k; }
     catch (e) { return Math.random().toString(36).slice(2, 10); }
@@ -949,8 +957,9 @@
   function gBroadcast() { broadcast({ t: 'gstate', g: GAME }); renderGame(); }
   // une action vient de cette personne : l'hôte l'applique directement, les autres l'envoient à l'hôte
   function gAction(act) {
-    if (isHost) { gApply(act, myCid, myName); gBroadcast(); }
-    else broadcast({ t: 'gact', act: act, cid: myCid, name: myName });
+    if (isHost) { gApply(act, gameId, myName); gBroadcast(); }
+    else if (!openConns().length) showToast('Jeux', "Pas de connexion à l'hôte : reviens à la salle");
+    else broadcast({ t: 'gact', act: act, cid: gameId, name: myName });
   }
   function gBtn(text, fn, dis) {
     var b = document.createElement('button'); b.type = 'button'; b.className = 'btn small'; b.textContent = text;
@@ -983,13 +992,13 @@
   var seenInvite = null, lastGameJson = '';
   function renderGame() {
     var fr = $('gframe');
-    if (fr && !fr.hidden && fr.contentWindow && fr.contentWindow.GameUI) fr.contentWindow.GameUI.show(GAME, myCid, isHost, gAction);
+    if (fr && !fr.hidden && fr.contentWindow && fr.contentWindow.GameUI) fr.contentWindow.GameUI.show(GAME, gameId, isHost, gAction);
     updateInvite();
   }
   function updateInvite() {
     var card = $('ginvite'); if (!card) return;
     var g = GAME, show = false;
-    if (g && g.invite && g.invite.cid !== myCid && seenInvite !== g.id && gPlayerIndex(g, myCid) < 0 &&
+    if (g && g.invite && g.invite.cid !== gameId && seenInvite !== g.id && gPlayerIndex(g, gameId) < 0 &&
         (GAME_TWO[g.type] ? g.status === 'lobby' : g.status === 'play')) show = true;
     card.hidden = !show;
     if (show) $('ginvite-text').textContent = g.invite.name + " t'invite à jouer : " + GAME_NAMES[g.type];

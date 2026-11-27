@@ -2,19 +2,15 @@ function $(id) { return document.getElementById(id); }
 var STATE = { g: null, me: '', host: false };
 var GAME_ACT = function () {};
 // envoie une action à la salle : directement à la page principale, sinon par la fonction reçue
-function sendAct(a) {
-  if (window.parent && typeof window.parent.gameAct === 'function') window.parent.gameAct(a);
-  else GAME_ACT(a);
+function flash(t) {
+  var body = document.getElementById('gbody'); if (!body) return;
+  var p = document.getElementById('gflash');
+  if (!p) { p = document.createElement('p'); p.id = 'gflash'; p.className = 'gscore'; body.insertBefore(p, body.firstChild); }
+  p.textContent = t;
 }
-// une action (choix, réponse, arrivée) est renvoyée tant que la salle ne l'a pas confirmée
-var PENDING = null, PENDING_TRIES = 0, PENDING_T = null;
-function pendingDone(a) {
-  var g = STATE.g; if (!g) return true;
-  if (a.a === 'pick') return !!(g.picked && g.picked[STATE.me]) || !!g.result;
-  if (a.a === 'join') return g.status !== 'lobby' || (g.players || []).some(function (p) { return p.cid === STATE.me; });
-  if (a.a === 'answer') return !!(g.answers && g.answers[STATE.me] !== undefined) || !!g.revealed;
-  if (a.a === 'move' && g.type === 'ttt') return !!g.board[a.i];
-  return true;
+function sendAct(a) {
+  if (window.parent && typeof window.parent.gameAct === 'function') { window.parent.gameAct(a); flash('Envoyé : ' + a.a); }
+  else { flash("La salle n'est pas reliée. Reviens à la salle et touche Jeux."); }
 }
 function act(a) {
   sendAct(a);
