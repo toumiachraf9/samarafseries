@@ -1,6 +1,11 @@
 function $(id) { return document.getElementById(id); }
 var STATE = { g: null, me: '', host: false };
 var GAME_ACT = function () {};
+// envoie une action à la salle : directement à la page principale, sinon par la fonction reçue
+function sendAct(a) {
+  if (window.parent && typeof window.parent.gameAct === 'function') window.parent.gameAct(a);
+  else GAME_ACT(a);
+}
 // une action (choix, réponse, arrivée) est renvoyée tant que la salle ne l'a pas confirmée
 var PENDING = null, PENDING_TRIES = 0, PENDING_T = null;
 function pendingDone(a) {
