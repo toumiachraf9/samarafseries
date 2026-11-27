@@ -820,50 +820,30 @@
   $('q-link').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addLinkToQueue(); } });
   // ---------- jeux à plusieurs : l'hôte garde la partie et valide chaque coup ----------
   var GAME = null, GAME_SECRET = null, GAME_SEQ = 0;
-  var GAME_NAMES = { ttt: 'Morpion', rps: 'Pierre-feuille-ciseaux', c4: 'Puissance 4', wordle: 'Mot mystère', quiz: 'Quiz' };
-  var GAME_TWO = { ttt: 1, rps: 1, c4: 1 };
-  var WORDS = ['chien','table','livre','arbre','route','fleur','nuage','pomme','lampe','porte','verre','plage','sable','neige','vague','poule','poire','rouge','jaune','orage','pluie','fruit','carte','bleue'];
+  var GAME_NAMES = { ttt: 'Morpion', rps: 'Pierre-feuille-ciseaux', wordle: 'Mot mystère', quiz: 'Quiz' };
+  var GAME_TWO = { ttt: 1, rps: 1 };
   var RPS_CH = ['Pierre', 'Feuille', 'Ciseaux'];
   var RPS_ICON = { Pierre: '✊', Feuille: '✋', Ciseaux: '✌️' };
-  var QUIZ = [
-    { q: 'Quelle est la capitale de la Tunisie ?', c: ['Sfax', 'Tunis', 'Sousse', 'Bizerte'], a: 1 },
-    { q: 'Combien de continents y a-t-il ?', c: ['5', '6', '7', '8'], a: 2 },
-    { q: 'Quel est le plus grand océan ?', c: ['Atlantique', 'Indien', 'Arctique', 'Pacifique'], a: 3 },
-    { q: 'Combien de côtés a un hexagone ?', c: ['5', '6', '7', '8'], a: 1 },
-    { q: 'Quelle planète est la plus proche du Soleil ?', c: ['Vénus', 'Mars', 'Mercure', 'Terre'], a: 2 },
-    { q: 'Combien font 12 × 12 ?', c: ['124', '132', '144', '156'], a: 2 },
-    { q: 'Qui a peint la Joconde ?', c: ['Van Gogh', 'Léonard de Vinci', 'Picasso', 'Monet'], a: 1 },
-    { q: 'Quel est le plus petit pays du monde ?', c: ['Monaco', 'Vatican', 'Malte', 'Saint-Marin'], a: 1 }
-  ];
   var TTT_LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 
   function gPlayerIndex(g, cid) { if (!g || !g.players) return -1; for (var i = 0; i < g.players.length; i++) if (g.players[i].cid === cid) return i; return -1; }
   function gName(g, i) { return g.players[i] ? g.players[i].name : '?'; }
-  function gNorm(v) { return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]/g, ''); }
-  function gNew(type, cid, name) {
-    var g = { id: ++GAME_SEQ, type: type, status: GAME_TWO[type] ? 'lobby' : 'play', players: [{ cid: cid, name: name }], turn: 0, msg: '' };
+  function gNew(type, cid, name, lang) {
+    var g = { id: ++GAME_SEQ, type: type, status: GAME_TWO[type] ? 'lobby' : 'play', players: [{ cid: cid, name: name }], turn: 0, msg: '', lang: (['fr', 'en', 'ar'].indexOf(lang) >= 0 ? lang : 'fr') };
     GAME_SECRET = {};
     if (type === 'ttt') g.board = ['', '', '', '', '', '', '', '', ''];
-    if (type === 'c4') { g.board = []; for (var r = 0; r < 6; r++) g.board.push([0, 0, 0, 0, 0, 0, 0]); }
     if (type === 'rps') { g.score = [0, 0, 0]; g.picked = {}; g.result = null; }
-    if (type === 'wordle') { g.rows = []; GAME_SECRET.word = WORDS[Math.floor(Math.random() * WORDS.length)]; }
-    if (type === 'quiz') { g.qi = 0; g.answers = {}; g.pn = {}; g.scores = {}; g.revealed = false; }
+    if (type === 'wordle') { g.rows = []; GAME_SECRET.word = pickWord(g.lang); }
+    if (type === 'quiz') {
+      var set = pickQuiz(g.lang, 10);                      // 10 questions tirées au hasard, réponses mélangées
+      GAME_SECRET.quiz = set.map(function (x) { return x.a; });
+      g.qs = set.map(function (x) { return { q: x.q, c: x.c }; });
+      g.qi = 0; g.answers = {}; g.pn = {}; g.scores = {}; g.revealed = false;
+    }
     return g;
   }
   function gWinLine(b) {
     for (var i = 0; i < TTT_LINES.length; i++) { var l = TTT_LINES[i]; if (b[l[0]] && b[l[0]] === b[l[1]] && b[l[0]] === b[l[2]]) return l; }
-    return null;
-  }
-  function c4Win(b, r, c) {
-    var v = b[r][c], dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
-    for (var d = 0; d < 4; d++) {
-      var cells = [[r, c]], dr = dirs[d][0], dc = dirs[d][1];
-      for (var s2 = -1; s2 <= 1; s2 += 2) {
-        var rr = r + dr * s2, cc = c + dc * s2;
-        while (rr >= 0 && rr < 6 && cc >= 0 && cc < 7 && b[rr][cc] === v) { cells.push([rr, cc]); rr += dr * s2; cc += dc * s2; }
-      }
-      if (cells.length >= 4) return cells;
-    }
     return null;
   }
   function wordleScore(guess, word) {
@@ -873,8 +853,8 @@
     return r;
   }
   function gReveal(g) {
-    var Q = QUIZ[g.qi]; g.revealed = true; g.correct = Q.a;
-    Object.keys(g.answers).forEach(function (k) { if (g.answers[k] === Q.a) g.scores[k] = (g.scores[k] || 0) + 1; });
+    var ans = GAME_SECRET.quiz[g.qi]; g.revealed = true; g.correct = ans;
+    Object.keys(g.answers).forEach(function (k) { if (g.answers[k] === ans) g.scores[k] = (g.scores[k] || 0) + 1; });
   }
   // seul l'hôte exécute ceci : il valide le coup puis diffuse l'état
   function gApply(act, cid, name) {
@@ -882,7 +862,7 @@
     var a = act.a;
     if (a === 'open') {
       if (GAME || !GAME_NAMES[act.type]) return;
-      GAME = gNew(act.type, cid, name); GAME.invite = { cid: cid, name: name }; return;
+      GAME = gNew(act.type, cid, name, act.lang); GAME.invite = { cid: cid, name: name }; return;
     }
     if (!GAME) return;
     var g = GAME, me = gPlayerIndex(g, cid);
@@ -902,19 +882,6 @@
       else g.turn = 1 - g.turn;
       return;
     }
-    if (g.type === 'c4' && a === 'move' && g.status === 'play' && me === g.turn) {
-      var col = act.col | 0;
-      if (col < 0 || col > 6) return;
-      var row = -1;
-      for (var r = 5; r >= 0; r--) if (!g.board[r][col]) { row = r; break; }
-      if (row < 0) return;
-      g.board[row][col] = me + 1; g.last = [row, col];
-      var cw = c4Win(g.board, row, col);
-      if (cw) { g.status = 'over'; g.winner = me; g.line = cw; }
-      else if (g.board[0].every(function (x) { return x; })) { g.status = 'over'; g.winner = -1; }
-      else g.turn = 1 - g.turn;
-      return;
-    }
     if (g.type === 'rps' && me >= 0 && g.players.length === 2) {
       if (a === 'next' && g.result) { g.result = null; g.msg = ''; return; }
       if (a === 'pick' && !g.result && RPS_CH.indexOf(act.c) >= 0 && !g.picked[cid]) {
@@ -931,12 +898,12 @@
       return;
     }
     if (g.type === 'wordle' && a === 'guess' && g.status === 'play') {
-      var gw = gNorm(act.w);
-      if (gw.length !== 5) { g.msg = 'Le mot doit faire 5 lettres.'; return; }
+      var key = gKey(act.w, g.lang), disp = gShow(act.w, g.lang);
+      if (gLen(key) !== 5) { g.msg = GT(curLang, 'wordle_len'); return; }
       g.msg = '';
-      g.rows.push({ w: gw, r: wordleScore(gw, GAME_SECRET.word), by: name });
-      if (gw === GAME_SECRET.word) { g.status = 'over'; g.won = true; g.word = GAME_SECRET.word; }
-      else if (g.rows.length >= 6) { g.status = 'over'; g.won = false; g.word = GAME_SECRET.word; }
+      g.rows.push({ d: Array.from(disp).slice(0, 5), r: wordleScore(Array.from(key), Array.from(GAME_SECRET.word.key)), by: name });
+      if (key === GAME_SECRET.word.key) { g.status = 'over'; g.won = true; g.word = GAME_SECRET.word.show; }
+      else if (g.rows.length >= 6) { g.status = 'over'; g.won = false; g.word = GAME_SECRET.word.show; }
       return;
     }
     if (g.type === 'quiz') {
@@ -950,7 +917,7 @@
       if (a === 'reveal' && !g.revealed && g.status === 'play') { gReveal(g); return; }
       if (a === 'nextq' && g.revealed) {
         g.qi++; g.answers = {}; g.revealed = false; delete g.correct;
-        if (g.qi >= QUIZ.length) g.status = 'over';
+        if (g.qi >= g.qs.length) g.status = 'over';
       }
     }
   }
@@ -958,32 +925,13 @@
   // une action vient de cette personne : l'hôte l'applique directement, les autres l'envoient à l'hôte
   function gAction(act) {
     if (isHost) { gApply(act, gameId, myName); gBroadcast(); }
-    else if (!openConns().length) showToast('Jeux', "Pas de connexion à l'hôte : reviens à la salle");
+    else if (!openConns().length) showToast('Jeux', GT(curLang, 'no_conn'));
     else broadcast({ t: 'gact', act: act, cid: gameId, name: myName });
   }
   function gBtn(text, fn, dis) {
     var b = document.createElement('button'); b.type = 'button'; b.className = 'btn small'; b.textContent = text;
     if (dis) b.disabled = true; else b.addEventListener('click', fn);
     return b;
-  }
-  function gStatus(g, mine) {
-    if (g.status === 'lobby') return "En attente d'un second joueur…";
-    if (g.type === 'ttt' || g.type === 'c4') {
-      if (g.status === 'over') return g.winner < 0 ? 'Match nul !' : gName(g, g.winner) + ' a gagné !';
-      return 'Au tour de ' + gName(g, g.turn) + (g.turn === mine ? ' (toi)' : '');
-    }
-    if (g.type === 'rps') {
-      if (g.result) return g.result.w < 0 ? 'Égalité !' : gName(g, g.result.w) + ' gagne la manche !';
-      if (mine < 0) return 'Les deux joueurs choisissent en secret.';
-      if (g.picked[myCid]) return "Choix envoyé, en attente de l'adversaire…";
-      return 'Fais ton choix.';
-    }
-    if (g.type === 'wordle') {
-      if (g.status === 'over') return g.won ? 'Bravo, trouvé !' : 'Perdu. Le mot était : ' + String(g.word).toUpperCase();
-      return 'Essai ' + (g.rows.length + 1) + ' / 6 : propose un mot de 5 lettres.';
-    }
-    if (g.type === 'quiz') return g.status === 'over' ? 'Quiz terminé !' : 'Question ' + (g.qi + 1) + ' / ' + QUIZ.length;
-    return '';
   }
   function gScoreText(g) {
     return Object.keys(g.pn || {}).map(function (k) { return g.pn[k] + ' : ' + (g.scores[k] || 0); }).join(' · ');
@@ -992,7 +940,7 @@
   var seenInvite = null, lastGameJson = '';
   function renderGame() {
     var box = $('gbox');
-    if (box && !box.hidden && window.GameUI) GameUI.show(GAME, gameId, isHost, gAction);
+    if (box && !box.hidden && window.GameUI) GameUI.show(GAME, gameId, isHost, gAction, curLang);
     updateInvite();
   }
   function updateInvite() {
@@ -1001,14 +949,41 @@
     if (g && g.invite && g.invite.cid !== gameId && seenInvite !== g.id && gPlayerIndex(g, gameId) < 0 &&
         (GAME_TWO[g.type] ? g.status === 'lobby' : g.status === 'play')) show = true;
     card.hidden = !show;
-    if (show) $('ginvite-text').textContent = g.invite.name + " t'invite à jouer : " + GAME_NAMES[g.type];
+    $('ginvite-yes').textContent = GT(curLang, 'accept'); $('ginvite-no').textContent = GT(curLang, 'refuse');
+    if (show) $('ginvite-text').textContent = GT(curLang, 'invite', { n: g.invite.name, g: GT(curLang, 'name_' + g.type) });
   }
-  function openGames() { $('gbox').hidden = false; renderGame(); }
+  // musique de fond des jeux (fichier mp3 du site) : un passage au hasard, une minute entière, à chaque ouverture
+  var gmAudio = null, gmWant = false;
+  function gmLabel() { var b = $('g-music'); if (b) b.textContent = gmWant ? '🔊' : '🔇'; }
+  function gmEl() {
+    if (!gmAudio) { gmAudio = new Audio('assets/game-music.mp3'); gmAudio.loop = true; gmAudio.preload = 'auto'; gmAudio.volume = 0.35; }
+    return gmAudio;
+  }
+  function gmStartAt(a) {
+    var dur = a.duration;
+    if (dur && isFinite(dur) && dur > 61) a.currentTime = Math.floor(Math.random() * (Math.floor((dur - 60) / 60) + 1)) * 60;
+  }
+  function gmPlay() {
+    gmWant = true; gmLabel();
+    var a = gmEl();
+    if (a.readyState >= 1) { gmStartAt(a); a.play().catch(function () {}); }
+    else a.addEventListener('loadedmetadata', function once() {
+      a.removeEventListener('loadedmetadata', once);
+      if (gmWant) { gmStartAt(a); a.play().catch(function () {}); }
+    });
+  }
+  function gmStop() { gmWant = false; gmLabel(); if (gmAudio) gmAudio.pause(); }
+  $('g-music').addEventListener('click', function () { if (gmWant) gmStop(); else gmPlay(); });
+
+  function openGames() { $('gbox').hidden = false; renderGame(); gmPlay(); }
+  // Fermer : arrête la partie (joueurs et hôte) puis revient à la liste des jeux
   function closeGames() {
-    // une partie terminée est retirée : la prochaine ouverture affiche la liste des jeux
-    if (GAME && GAME.status === 'over') gAction({ a: 'close' });
-    $('gbox').hidden = true;
+    var inGame = gPlayerIndex(GAME, gameId) >= 0;
+    if (GAME && (inGame || isHost || GAME.status === 'over')) gAction({ a: 'close' });
+    $('gbox').hidden = true; gmStop();
   }
+  // Jeux (bouton) : cache seulement la fenêtre, sans arrêter la partie
+  function hideGames() { $('gbox').hidden = true; gmStop(); }
   window.closeGamesFromFrame = closeGames;
   window.gameAct = function (a) { gAction(a); };
   function acceptInvite() {
@@ -1018,7 +993,7 @@
     updateInvite();
   }
   function declineInvite() { if (GAME) seenInvite = GAME.id; updateInvite(); }
-  $('btn-games').addEventListener('click', function () { if ($('gbox').hidden) openGames(); else closeGames(); });
+  $('btn-games').addEventListener('click', function () { if ($('gbox').hidden) openGames(); else hideGames(); });
   $('ginvite-yes').addEventListener('click', acceptInvite);
   $('ginvite-no').addEventListener('click', declineInvite);
   function toggleQueue() { $('qpanel').hidden = !$('qpanel').hidden; }
@@ -1358,7 +1333,7 @@
           var gj = JSON.stringify(d.g || null);
           if (gj === lastGameJson) break;              // rien de nouveau : on ne redessine pas (la saisie reste)
           lastGameJson = gj;
-          var wasGame = GAME; GAME = d.g || null; if (GAME && !wasGame) showToast('Jeux', 'Une partie vient de commencer'); renderGame();
+          var wasGame = GAME; GAME = d.g || null; if (GAME && !wasGame) showToast('Jeux', GT(curLang, 'started')); renderGame();
         }
         break;
       case 'gact':

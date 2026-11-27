@@ -531,8 +531,18 @@
   .gbox .hole { background: var(--bg); }
   .gbox .gmsg, .gbox .gscore, .gbox .qq { color: var(--fg); }
   .gbox .qprog { color: var(--accent); }
-  .ginvite { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 80; background: var(--panel-2); border: 1px solid var(--accent); border-radius: 14px; padding: 12px 14px; display: flex; gap: 12px; align-items: center; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); max-width: 92vw; }
-  .gi-btns { display: flex; gap: 8px; }
+  .ginvite { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; background: rgba(8, 7, 14, .65); backdrop-filter: blur(4px); padding: 16px; }
+  .ginvite[hidden] { display: none; }
+  .gi-card { width: min(92vw, 440px); padding: 30px 22px 26px; border-radius: 28px; background: var(--panel-2); border: 2px solid var(--accent); text-align: center; animation: giPop .55s cubic-bezier(.3, 1.4, .5, 1) both, giGlow 1.6s ease-in-out .55s infinite alternate; }
+  .gi-icon { font-size: 60px; line-height: 1; display: inline-block; animation: giBob 1.2s ease-in-out infinite; }
+  .gi-text { font-family: var(--f-display); font-size: 22px; line-height: 1.35; margin: 14px 0 22px; color: var(--fg); }
+  .gi-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .gi-btns .btn { font-size: 18px; padding: 14px 24px; min-width: 130px; }
+  .gi-btns .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  @keyframes giPop { from { transform: scale(.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes giBob { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-10px) rotate(6deg); } }
+  @keyframes giGlow { from { box-shadow: 0 0 0 0 rgba(255, 179, 71, .0), 0 30px 60px rgba(0, 0, 0, .6); } to { box-shadow: 0 0 0 10px rgba(255, 179, 71, .18), 0 30px 60px rgba(0, 0, 0, .6); } }
+  .gmusic-hide { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; right: 0; bottom: 0; }
   .btn.right { border-color: #2e9e4f; }
   .btn.wrong { border-color: #c44; }
   .rbar { display: flex; gap: 4px; margin-top: 4px; }
@@ -806,8 +816,8 @@
           <p class="error" id="q-link-err" role="alert"></p>
           <ul class="qlist" id="qlist"></ul>
         </div>
-        <div class="gbox" id="gbox" hidden><header class="ghead"><b id="gtitle">Jeux</b><button class="btn small" id="g-close" type="button">Fermer</button></header><main id="gbody"></main></div>
-                        <div class="ginvite" id="ginvite" hidden><span id="ginvite-text"></span><span class="gi-btns"><button class="btn small" id="ginvite-yes" type="button">Accepter</button><button class="btn small" id="ginvite-no" type="button">Refuser</button></span></div>
+        <div class="gbox" id="gbox" hidden><header class="ghead"><b id="gtitle">Jeux</b><button class="btn small" id="g-music" type="button" title="Musique">🔊</button><button class="btn small" id="g-close" type="button">Fermer</button></header><main id="gbody"></main></div>
+                        <div class="ginvite" id="ginvite" hidden><div class="gi-card"><div class="gi-icon">🎲</div><p class="gi-text" id="ginvite-text"></p><div class="gi-btns"><button class="btn primary" id="ginvite-yes" type="button">Accepter</button><button class="btn" id="ginvite-no" type="button">Refuser</button></div></div></div>
         <div class="tap" id="tap" hidden>
           <button class="btn primary" id="btn-tap" type="button" data-i18n="r_tap">Appuie pour lancer la lecture</button>
         </div>
@@ -997,8 +1007,9 @@
 <script src="js/app-1.js"></script>
 
 <script src="js/app-2.js"></script>
-<script src="js/games.js?v=13"></script>
-<script src="js/app-3.js?v=13"></script>
+<script src="js/games-content.js?v=15"></script>
+<script src="js/games.js?v=15"></script>
+<script src="js/app-3.js?v=18"></script>
 <script type="module" src="js/app-4-module.js"></script>
 </body>
 </html>
