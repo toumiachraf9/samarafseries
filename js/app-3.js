@@ -991,8 +991,8 @@
   // ---------- jeux : affichés par-dessus la salle ; l'hôte garde la partie et valide chaque coup ----------
   var seenInvite = null, lastGameJson = '';
   function renderGame() {
-    var fr = $('gframe');
-    if (fr && !fr.hidden && fr.contentWindow && fr.contentWindow.GameUI) fr.contentWindow.GameUI.show(GAME, gameId, isHost, gAction);
+    var box = $('gbox');
+    if (box && !box.hidden && window.GameUI) GameUI.show(GAME, gameId, isHost, gAction);
     updateInvite();
   }
   function updateInvite() {
@@ -1003,15 +1003,14 @@
     card.hidden = !show;
     if (show) $('ginvite-text').textContent = g.invite.name + " t'invite à jouer : " + GAME_NAMES[g.type];
   }
-  function openGames() { $('gframe').hidden = false; renderGame(); }
+  function openGames() { $('gbox').hidden = false; renderGame(); }
   function closeGames() {
     // une partie terminée est retirée : la prochaine ouverture affiche la liste des jeux
     if (GAME && GAME.status === 'over') gAction({ a: 'close' });
-    $('gframe').hidden = true;
+    $('gbox').hidden = true;
   }
   window.closeGamesFromFrame = closeGames;
   window.gameAct = function (a) { gAction(a); };
-  $('gframe').addEventListener('load', renderGame);
   function acceptInvite() {
     var g = GAME; if (!g) return;
     seenInvite = g.id; openGames();
@@ -1019,7 +1018,7 @@
     updateInvite();
   }
   function declineInvite() { if (GAME) seenInvite = GAME.id; updateInvite(); }
-  $('btn-games').addEventListener('click', function () { if ($('gframe').hidden) openGames(); else closeGames(); });
+  $('btn-games').addEventListener('click', function () { if ($('gbox').hidden) openGames(); else closeGames(); });
   $('ginvite-yes').addEventListener('click', acceptInvite);
   $('ginvite-no').addEventListener('click', declineInvite);
   function toggleQueue() { $('qpanel').hidden = !$('qpanel').hidden; }
