@@ -171,9 +171,11 @@ function gShuffle(arr) {
   return a;
 }
 // tire n questions au hasard, mélange l'ordre des réponses ; renvoie [{q, c, a}] (a = bonne réponse dans c)
-function pickQuiz(lang, n) {
-  var bank = QUIZ_BANK[lang] || QUIZ_BANK.fr;
-  return gShuffle(bank).slice(0, n).map(function (item) {
+function pickQuiz(lang, n, which, exclude) {
+  var bank = ((which === 'series') ? SERIES_BANK : QUIZ_BANK)[lang] || QUIZ_BANK.fr;
+  var ex = exclude || [];
+  var pool = bank.filter(function (item) { return ex.indexOf(item[0]) < 0; });
+  return gShuffle(pool).slice(0, n).map(function (item) {
     var order = gShuffle([0, 1, 2, 3]);
     var c = order.map(function (k) { return item[1][k]; });
     return { q: item[0], c: c, a: order.indexOf(item[2]) };
@@ -185,3 +187,998 @@ function pickWord(lang) {
   var w = list[Math.floor(Math.random() * list.length)];
   return { key: gKey(w, lang), show: gShow(w, lang) };
 }
+
+// ---------- quiz Lost / The 100 (même moteur que le quiz) ----------
+var SERIES_BANK = {
+  "fr": [
+    [
+      "Quel est le nom de l'avion qui s'écrase sur l'île au début de Lost ?",
+      [
+        "Oceanic 815",
+        "Pan Am 103",
+        "Air France 447",
+        "Vol 370"
+      ],
+      0
+    ],
+    [
+      "Quel est le chiffre le plus répété dans Lost ?",
+      [
+        "42",
+        "7",
+        "13",
+        "108"
+      ],
+      0
+    ],
+    [
+      "Quelle compagnie est derrière le projet sur l'île ?",
+      [
+        "Initiative Dharma",
+        "Oceanic Airlines",
+        "Widmore Industries",
+        "Fondation Hanso"
+      ],
+      0
+    ],
+    [
+      "Comment s'appelle le premier épisode de Lost ?",
+      [
+        "Pilote",
+        "La Balise",
+        "Le Crash",
+        "Bienvenue"
+      ],
+      0
+    ],
+    [
+      "Où vivent les 100 jeunes avant de descendre sur Terre ?",
+      [
+        "Une station spatiale (l'Arche)",
+        "Une base sous-marine",
+        "Un bunker",
+        "Une colonie sur Mars"
+      ],
+      0
+    ],
+    [
+      "Quel personnage est mécanicienne sur l'Arche ?",
+      [
+        "Raven Reyes",
+        "Octavia Blake",
+        "Harper McIntyre",
+        "Monty Green"
+      ],
+      0
+    ],
+    [
+      "Qui est la commandante de Trikru ?",
+      [
+        "Lexa",
+        "Anya",
+        "Indra",
+        "Nia"
+      ],
+      0
+    ],
+    [
+      "Comment appelle-t-on les habitants de la Terre rencontrés par les 100 ?",
+      [
+        "Les Terrestres (Grounders)",
+        "Les Ombres",
+        "Les Sans-Terre",
+        "Les Nomades"
+      ],
+      0
+    ],
+    [
+      "Quel est le nom du chancelier de l'Arche ?",
+      [
+        "Thelonious Jaha",
+        "Dante Wallace",
+        "Cage Wallace",
+        "Marcus Kane"
+      ],
+      0
+    ],
+    [
+      "Quel est le nom du chien de Walt dans Lost ?",
+      [
+        "Vincent",
+        "Max",
+        "Bob",
+        "Rex"
+      ],
+      0
+    ],
+    [
+      "Quelle est la profession de Jack Shephard ?",
+      [
+        "Chirurgien",
+        "Pilote",
+        "Policier",
+        "Professeur"
+      ],
+      0
+    ],
+    [
+      "De quel pays vient Sun ?",
+      [
+        "Corée du Sud",
+        "Japon",
+        "Chine",
+        "Vietnam"
+      ],
+      0
+    ],
+    [
+      "Quel est le prénom de Locke ?",
+      [
+        "John",
+        "Jack",
+        "James",
+        "Juan"
+      ],
+      0
+    ],
+    [
+      "Quel est le nom de famille de Bellamy ?",
+      [
+        "Blake",
+        "Griffin",
+        "Reyes",
+        "Jaha"
+      ],
+      0
+    ],
+    [
+      "Quel peuple est dirigé par Lexa ?",
+      [
+        "Trikru",
+        "Skaikru",
+        "Azgeda",
+        "Maunon"
+      ],
+      0
+    ],
+    [
+      "Quelle est la nationalité de Jin ?",
+      [
+        "Coréenne",
+        "Japonaise",
+        "Chinoise",
+        "Vietnamienne"
+      ],
+      0
+    ],
+    [
+      "Quel est le métier de Charlie Pace ?",
+      [
+        "Chirurgien",
+        "Musicien",
+        "Pilote",
+        "Écrivain"
+      ],
+      1
+    ],
+    [
+      "Quel est le nom de famille de Sayid ?",
+      [
+        "Jarrah",
+        "Hassan",
+        "Karim",
+        "Nadir"
+      ],
+      0
+    ],
+    [
+      "Quel est le nom de famille de Charlie ?",
+      [
+        "Cole",
+        "Pace",
+        "Hart",
+        "Reed"
+      ],
+      1
+    ],
+    [
+      "Quel est le nom de famille de Finn ?",
+      [
+        "Murphy",
+        "Miller",
+        "Wells",
+        "Collins"
+      ],
+      3
+    ],
+    [
+      "Quel est le nom de famille de Monty ?",
+      [
+        "Blake",
+        "Green",
+        "Reyes",
+        "Cole"
+      ],
+      1
+    ],
+    [
+      "Quel est le nom de famille d'Harper ?",
+      [
+        "Miller",
+        "Hayes",
+        "McIntyre",
+        "Moss"
+      ],
+      2
+    ],
+    [
+      "Quel est le nom de famille de Jasper ?",
+      [
+        "Adams",
+        "Lee",
+        "Stone",
+        "Jordan"
+      ],
+      3
+    ],
+    [
+      "Quel est le nom de famille de Thelonious ?",
+      [
+        "Wallace",
+        "Jaha",
+        "Kane",
+        "Griffin"
+      ],
+      1
+    ],
+    [
+      "Quel est le nom de famille de Marcus ?",
+      [
+        "Wallace",
+        "Jaha",
+        "Kane",
+        "Blake"
+      ],
+      2
+    ],
+    [
+      "Quel est le nom de famille de Dante ?",
+      [
+        "Kane",
+        "Jaha",
+        "Griffin",
+        "Wallace"
+      ],
+      3
+    ],
+    [
+      "Quel est le nom de l'écoutille où Desmond tape les chiffres ?",
+      [
+        "La Balise",
+        "L'Écoutille (The Hatch)",
+        "Le Phare",
+        "La Station Flamme"
+      ],
+      1
+    ],
+    [
+      "Quel est le nom du groupe de Charlie Pace ?",
+      [
+        "Drive Shaft",
+        "The Beatles",
+        "Oasis",
+        "Radiohead"
+      ],
+      0
+    ],
+    [
+      "Quel est le surnom de Hugo Reyes ?",
+      [
+        "Huggy",
+        "Big Hugo",
+        "Hurley",
+        "Reyes"
+      ],
+      2
+    ],
+    [
+      "Quel est le surnom de James Ford ?",
+      [
+        "Jimmy",
+        "Jim",
+        "Boss",
+        "Sawyer"
+      ],
+      3
+    ],
+    [
+      "Dans quelle saison les 100 arrivent-ils sur Terre ?",
+      [
+        "Saison 2",
+        "Saison 1",
+        "Saison 3",
+        "Saison 4"
+      ],
+      1
+    ]
+  ],
+  "en": [
+    [
+      "What is the name of the plane that crashes on the island at the start of Lost?",
+      [
+        "Oceanic 815",
+        "Pan Am 103",
+        "Air France 447",
+        "Flight 370"
+      ],
+      0
+    ],
+    [
+      "Which number appears most often in Lost?",
+      [
+        "42",
+        "7",
+        "13",
+        "108"
+      ],
+      0
+    ],
+    [
+      "Which company is behind the project on the island?",
+      [
+        "Dharma Initiative",
+        "Oceanic Airlines",
+        "Widmore Industries",
+        "Hanso Foundation"
+      ],
+      0
+    ],
+    [
+      "What is the name of the first episode of Lost?",
+      [
+        "Pilot",
+        "The Beacon",
+        "The Crash",
+        "Welcome"
+      ],
+      0
+    ],
+    [
+      "Where do the 100 young people live before going down to Earth?",
+      [
+        "A space station (the Ark)",
+        "An underwater base",
+        "A bunker",
+        "A colony on Mars"
+      ],
+      0
+    ],
+    [
+      "Which character is the mechanic on the Ark?",
+      [
+        "Raven Reyes",
+        "Octavia Blake",
+        "Harper McIntyre",
+        "Monty Green"
+      ],
+      0
+    ],
+    [
+      "Who is the commander of Trikru?",
+      [
+        "Lexa",
+        "Anya",
+        "Indra",
+        "Nia"
+      ],
+      0
+    ],
+    [
+      "What do the 100 call the people of Earth they meet?",
+      [
+        "Grounders",
+        "The Shadows",
+        "The Earthless",
+        "The Nomads"
+      ],
+      0
+    ],
+    [
+      "What is the name of the Ark's chancellor?",
+      [
+        "Thelonious Jaha",
+        "Dante Wallace",
+        "Cage Wallace",
+        "Marcus Kane"
+      ],
+      0
+    ],
+    [
+      "What is Walt's dog called in Lost?",
+      [
+        "Vincent",
+        "Max",
+        "Bob",
+        "Rex"
+      ],
+      0
+    ],
+    [
+      "What is Jack Shephard's job?",
+      [
+        "Surgeon",
+        "Pilot",
+        "Police officer",
+        "Teacher"
+      ],
+      0
+    ],
+    [
+      "Which country is Sun from?",
+      [
+        "South Korea",
+        "Japan",
+        "China",
+        "Vietnam"
+      ],
+      0
+    ],
+    [
+      "What is Locke's first name?",
+      [
+        "John",
+        "Jack",
+        "James",
+        "Juan"
+      ],
+      0
+    ],
+    [
+      "What is Bellamy's last name?",
+      [
+        "Blake",
+        "Griffin",
+        "Reyes",
+        "Jaha"
+      ],
+      0
+    ],
+    [
+      "Which people does Lexa lead?",
+      [
+        "Trikru",
+        "Skaikru",
+        "Azgeda",
+        "Maunon"
+      ],
+      0
+    ],
+    [
+      "What is Jin's nationality?",
+      [
+        "Korean",
+        "Japanese",
+        "Chinese",
+        "Vietnamese"
+      ],
+      0
+    ],
+    [
+      "What is Charlie Pace's job?",
+      [
+        "Surgeon",
+        "Musician",
+        "Pilot",
+        "Writer"
+      ],
+      1
+    ],
+    [
+      "What is Sayid's last name?",
+      [
+        "Jarrah",
+        "Hassan",
+        "Karim",
+        "Nadir"
+      ],
+      0
+    ],
+    [
+      "What is Charlie's last name?",
+      [
+        "Cole",
+        "Pace",
+        "Hart",
+        "Reed"
+      ],
+      1
+    ],
+    [
+      "What is Finn's last name?",
+      [
+        "Murphy",
+        "Miller",
+        "Wells",
+        "Collins"
+      ],
+      3
+    ],
+    [
+      "What is Monty's last name?",
+      [
+        "Blake",
+        "Green",
+        "Reyes",
+        "Cole"
+      ],
+      1
+    ],
+    [
+      "What is Harper's last name?",
+      [
+        "Miller",
+        "Hayes",
+        "McIntyre",
+        "Moss"
+      ],
+      2
+    ],
+    [
+      "What is Jasper's last name?",
+      [
+        "Adams",
+        "Lee",
+        "Stone",
+        "Jordan"
+      ],
+      3
+    ],
+    [
+      "What is Thelonious's last name?",
+      [
+        "Wallace",
+        "Jaha",
+        "Kane",
+        "Griffin"
+      ],
+      1
+    ],
+    [
+      "What is Marcus's last name?",
+      [
+        "Wallace",
+        "Jaha",
+        "Kane",
+        "Blake"
+      ],
+      2
+    ],
+    [
+      "What is Dante's last name?",
+      [
+        "Kane",
+        "Jaha",
+        "Griffin",
+        "Wallace"
+      ],
+      3
+    ],
+    [
+      "What is the name of the hatch where Desmond types the numbers?",
+      [
+        "The Beacon",
+        "The Hatch",
+        "The Lighthouse",
+        "The Flame Station"
+      ],
+      1
+    ],
+    [
+      "What is the name of Charlie Pace's band?",
+      [
+        "Drive Shaft",
+        "The Beatles",
+        "Oasis",
+        "Radiohead"
+      ],
+      0
+    ],
+    [
+      "What is Hugo Reyes's nickname?",
+      [
+        "Huggy",
+        "Big Hugo",
+        "Hurley",
+        "Reyes"
+      ],
+      2
+    ],
+    [
+      "What is James Ford's nickname?",
+      [
+        "Jimmy",
+        "Jim",
+        "Boss",
+        "Sawyer"
+      ],
+      3
+    ],
+    [
+      "In which season do the 100 arrive on Earth?",
+      [
+        "Season 2",
+        "Season 1",
+        "Season 3",
+        "Season 4"
+      ],
+      1
+    ]
+  ],
+  "ar": [
+    [
+      "ما اسم الطائرة التي تتحطم على الجزيرة في بداية Lost؟",
+      [
+        "أوشيانيك 815",
+        "بان أم 103",
+        "إير فرانس 447",
+        "الرحلة 370"
+      ],
+      0
+    ],
+    [
+      "أي رقم يتكرر أكثر في Lost؟",
+      [
+        "42",
+        "7",
+        "13",
+        "108"
+      ],
+      0
+    ],
+    [
+      "أي شركة تقف وراء المشروع على الجزيرة؟",
+      [
+        "مبادرة دارما",
+        "أوشيانيك للطيران",
+        "شركة ويدمور",
+        "مؤسسة هانسو"
+      ],
+      0
+    ],
+    [
+      "ما اسم أول حلقة في Lost؟",
+      [
+        "الطيار",
+        "المنارة",
+        "التحطم",
+        "أهلاً بك"
+      ],
+      0
+    ],
+    [
+      "أين يعيش الـ100 الشباب قبل النزول إلى الأرض؟",
+      [
+        "محطة فضائية (الفُلك)",
+        "قاعدة تحت الماء",
+        "ملجأ",
+        "مستعمرة على المريخ"
+      ],
+      0
+    ],
+    [
+      "أي شخصية هي الميكانيكية على الفُلك؟",
+      [
+        "ريفن ريس",
+        "أوكتافيا بلايك",
+        "هاربر ماكنتاير",
+        "مونتي غرين"
+      ],
+      0
+    ],
+    [
+      "من هي قائدة تريكرو؟",
+      [
+        "ليكسا",
+        "آنيا",
+        "إندرا",
+        "نيا"
+      ],
+      0
+    ],
+    [
+      "ماذا يسمي الـ100 سكان الأرض الذين يلتقونهم؟",
+      [
+        "الأرضيون (Grounders)",
+        "الظلال",
+        "عديمو الأرض",
+        "البدو"
+      ],
+      0
+    ],
+    [
+      "ما اسم مستشار الفُلك؟",
+      [
+        "ثيلونيوس جاها",
+        "دانتي والاس",
+        "كيج والاس",
+        "ماركوس كين"
+      ],
+      0
+    ],
+    [
+      "ما اسم كلب والت في Lost؟",
+      [
+        "فينسينت",
+        "ماكس",
+        "بوب",
+        "ريكس"
+      ],
+      0
+    ],
+    [
+      "ما مهنة جاك شيفرد؟",
+      [
+        "جراح",
+        "طيار",
+        "شرطي",
+        "معلم"
+      ],
+      0
+    ],
+    [
+      "من أي بلد هي سون؟",
+      [
+        "كوريا الجنوبية",
+        "اليابان",
+        "الصين",
+        "فيتنام"
+      ],
+      0
+    ],
+    [
+      "ما الاسم الأول للوك؟",
+      [
+        "جون",
+        "جاك",
+        "جيمس",
+        "خوان"
+      ],
+      0
+    ],
+    [
+      "ما اسم عائلة بيلامي؟",
+      [
+        "بلاك",
+        "غريفين",
+        "ريس",
+        "جاها"
+      ],
+      0
+    ],
+    [
+      "أي شعب تقوده ليكسا؟",
+      [
+        "تريكرو",
+        "سكايكرو",
+        "أزجيدا",
+        "مونون"
+      ],
+      0
+    ],
+    [
+      "ما جنسية جين؟",
+      [
+        "كورية",
+        "يابانية",
+        "صينية",
+        "فيتنامية"
+      ],
+      0
+    ],
+    [
+      "ما مهنة تشارلي بايس؟",
+      [
+        "جراح",
+        "موسيقي",
+        "طيار",
+        "كاتب"
+      ],
+      1
+    ],
+    [
+      "ما اسم عائلة سايد؟",
+      [
+        "جارا",
+        "حسن",
+        "كريم",
+        "نادر"
+      ],
+      0
+    ],
+    [
+      "ما اسم عائلة تشارلي؟",
+      [
+        "كول",
+        "بايس",
+        "هارت",
+        "ريد"
+      ],
+      1
+    ],
+    [
+      "ما اسم عائلة فين؟",
+      [
+        "مورفي",
+        "ميلر",
+        "ويلز",
+        "كولينز"
+      ],
+      3
+    ],
+    [
+      "ما اسم عائلة مونتي؟",
+      [
+        "بلايك",
+        "غرين",
+        "ريس",
+        "كول"
+      ],
+      1
+    ],
+    [
+      "ما اسم عائلة هاربر؟",
+      [
+        "ميلر",
+        "هايس",
+        "ماكنتاير",
+        "موس"
+      ],
+      2
+    ],
+    [
+      "ما اسم عائلة جاسبر؟",
+      [
+        "آدامز",
+        "لي",
+        "ستون",
+        "جوردان"
+      ],
+      3
+    ],
+    [
+      "ما اسم عائلة ثيلونيوس؟",
+      [
+        "والاس",
+        "جاها",
+        "كين",
+        "غريفين"
+      ],
+      1
+    ],
+    [
+      "ما اسم عائلة ماركوس؟",
+      [
+        "والاس",
+        "جاها",
+        "كين",
+        "بلايك"
+      ],
+      2
+    ],
+    [
+      "ما اسم عائلة دانتي؟",
+      [
+        "كين",
+        "جاها",
+        "غريفين",
+        "والاس"
+      ],
+      3
+    ],
+    [
+      "ما اسم الفتحة التي يكتب فيها ديزموند الأرقام؟",
+      [
+        "المنارة",
+        "الفتحة (The Hatch)",
+        "القاعدة الشمالية",
+        "محطة اللهب"
+      ],
+      1
+    ],
+    [
+      "ما اسم فرقة تشارلي بايس؟",
+      [
+        "درايف شافت",
+        "ذا بيتلز",
+        "أوزيس",
+        "راديوهيد"
+      ],
+      0
+    ],
+    [
+      "ما لقب هوغو ريس؟",
+      [
+        "هاغي",
+        "بيغ هوغو",
+        "هيرلي",
+        "ريس"
+      ],
+      2
+    ],
+    [
+      "ما لقب جيمس فورد؟",
+      [
+        "جيمي",
+        "جيم",
+        "بوس",
+        "سوير"
+      ],
+      3
+    ],
+    [
+      "في أي موسم يصل الـ100 إلى الأرض؟",
+      [
+        "الموسم 2",
+        "الموسم 1",
+        "الموسم 3",
+        "الموسم 4"
+      ],
+      1
+    ]
+  ]
+};
+
+// ---------- coloriage : images à colorier (chaque zone est un élément, {F} = couleur)
+var COLOR_PALETTE = ['#f5a07f', '#e8a722', '#7bc96f', '#4aa3df', '#e05d6f', '#a57bd9', '#7a5230', '#ffffff'];
+var COLOR_SUBJECTS = [
+  { id: 'cat', parts: [
+    '<ellipse cx="150" cy="170" rx="95" ry="85" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<polygon points="70,120 85,35 140,100" fill="{F}" stroke="#2b3d55" stroke-width="4" stroke-linejoin="round"/>',
+    '<polygon points="230,120 215,35 160,100" fill="{F}" stroke="#2b3d55" stroke-width="4" stroke-linejoin="round"/>',
+    '<circle cx="115" cy="160" r="14" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<circle cx="185" cy="160" r="14" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<polygon points="140,195 160,195 150,210" fill="{F}" stroke="#2b3d55" stroke-width="4" stroke-linejoin="round"/>'
+  ] },
+  { id: 'fish', parts: [
+    '<ellipse cx="135" cy="150" rx="95" ry="60" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<polygon points="220,150 290,100 290,200" fill="{F}" stroke="#2b3d55" stroke-width="4" stroke-linejoin="round"/>',
+    '<polygon points="110,92 140,50 165,95" fill="{F}" stroke="#2b3d55" stroke-width="4" stroke-linejoin="round"/>',
+    '<circle cx="95" cy="135" r="12" fill="{F}" stroke="#2b3d55" stroke-width="4"/>'
+  ] },
+  { id: 'room', parts: [
+    '<rect x="20" y="20" width="260" height="200" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="20" y="220" width="260" height="60" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="50" y="60" width="70" height="70" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="190" y="110" width="60" height="110" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="95" y="175" width="95" height="40" rx="8" fill="{F}" stroke="#2b3d55" stroke-width="4"/>'
+  ] },
+  { id: 'mug', parts: [
+    '<rect x="70" y="80" width="130" height="150" rx="14" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<path d="M200 110 h25 a35 35 0 0 1 0 70 h-25" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<ellipse cx="135" cy="245" rx="115" ry="20" fill="{F}" stroke="#2b3d55" stroke-width="4"/>'
+  ] }
+];
+function colorMarkup(sub, regions) {
+  return sub.parts.map(function (p, i) {
+    return p.replace('{F}', regions[i] || '#ffffff').replace(/^<(\w+)/, '<$1 data-r="' + i + '"');
+  }).join('');
+}
+function pickColorSubject() { return COLOR_SUBJECTS[Math.floor(Math.random() * COLOR_SUBJECTS.length)]; }
+
+var GT_EXTRA = {
+  fr: { name_series: 'Quiz Lost / The 100', desc_series: 'Questions sur les deux séries', name_color: 'Coloriage', desc_color: 'Colorie une image à tour de rôle',
+        pick_color: 'Choisis une couleur, puis touche une zone', color_done: 'Coloriage terminé !', save_img: "Sauvegarder l'image", color_join: 'Rejoindre le coloriage' },
+  en: { name_series: 'Lost / The 100 quiz', desc_series: 'Questions about both shows', name_color: 'Coloring', desc_color: 'Color a picture, one turn at a time',
+        pick_color: 'Pick a color, then tap an area', color_done: 'Coloring finished!', save_img: 'Save image', color_join: 'Join the coloring' },
+  ar: { name_series: 'مسابقة Lost / The 100', desc_series: 'أسئلة عن المسلسلين', name_color: 'تلوين', desc_color: 'لوّن صورة بالتناوب',
+        pick_color: 'اختر لوناً، ثم اضغط على منطقة', color_done: 'انتهى التلوين!', save_img: 'حفظ الصورة', color_join: 'انضم إلى التلوين' }
+};
+Object.keys(GT_EXTRA).forEach(function (l) { Object.assign(GAME_T[l], GT_EXTRA[l]); });
+Object.keys({fr:1,en:1,ar:1}).forEach(function (l) {
+  Object.assign(GAME_T[l], {
+    quiz_batch_done: { fr: '10 questions terminées ! Continuer ?', en: 'Round finished! Keep going?', ar: 'انتهت 10 أسئلة! هل تكملون؟' }[l],
+    dont_know: { fr: 'Je ne sais pas', en: "I don't know", ar: 'لا أعرف' }[l],
+    more10: { fr: 'Continuer (10 de plus)', en: 'Continue (10 more)', ar: 'متابعة (10 أسئلة أخرى)' }[l],
+    end_quiz: { fr: 'Terminer le quiz', en: 'End the quiz', ar: 'إنهاء المسابقة' }[l]
+  });
+});

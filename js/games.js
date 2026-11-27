@@ -8,8 +8,8 @@ var RPS_CH = ['Pierre', 'Feuille', 'Ciseaux'];
 var RPS_KIND = { Pierre: 'rock', Feuille: 'paper', Ciseaux: 'scissors' };
 var LANG_LABEL = { fr: 'Français', en: 'English', ar: 'العربية' };
 var HS = '#f5a07f', HL = '#d9826a', HY = '#e8a722';
-var NEEDS_LANG = { quiz: 1, wordle: 1 };
-var GAME_KEYS = ['ttt', 'rps', 'wordle', 'quiz'];
+var NEEDS_LANG = { quiz: 1, series: 1 };
+var GAME_KEYS = ['ttt', 'rps', 'series', 'color', 'quiz'];
 
 function gEl(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function T(key, vars) { return GT(STATE.ui, key, vars); }
@@ -55,13 +55,14 @@ function pendingDone(a) {
   var g = STATE.g; if (!g) return true;
   if (a.a === 'pick') return !!(g.picked && g.picked[STATE.me]) || !!g.result;
   if (a.a === 'join') return g.status !== 'lobby' || (g.players || []).some(function (p) { return p.cid === STATE.me; });
-  if (a.a === 'answer') return !!(g.answers && g.answers[STATE.me] !== undefined) || !!g.revealed;
+  if (a.a === 'answer') return a.qi !== g.qi || !!(g.answers && g.answers[STATE.me] !== undefined) || !!g.revealed;
   if (a.a === 'move' && g.type === 'ttt') return !!g.board[a.i];
+  if (a.a === 'paint') return !!(g.regions && g.regions[a.r] !== null);
   return true;
 }
 function act(a) {
   sendAct(a);
-  if (['pick', 'join', 'answer', 'move'].indexOf(a.a) < 0) return;
+  if (['pick', 'join', 'answer', 'move', 'paint'].indexOf(a.a) < 0) return;
   PENDING = a; PENDING_TRIES = 0; clearInterval(PENDING_T);
   PENDING_T = setInterval(function () {
     if (!PENDING || pendingDone(PENDING) || ++PENDING_TRIES > 5) { clearInterval(PENDING_T); PENDING = null; return; }
@@ -86,6 +87,8 @@ function gStatus(g, mine) {
     if (g.status === 'over') return g.won ? T('wordle_win') : T('wordle_lose', { w: g.word });
     return T('wordle_status', { i: g.rows.length + 1 });
   }
+  if (g.type === 'color') { var who = g.players[g.turn % g.players.length]; return g.status === 'over' ? T('color_done') : T('turn', { n: who ? who.name : '?' }) + (g.turn % g.players.length === mine ? ' ' + T('you') : ''); }
+  if (g.type === 'quiz' && g.status === 'batchdone') return T('quiz_batch_done');
   if (g.type === 'quiz') return g.status === 'over' ? T('quiz_done') : T('quiz_q', { i: g.qi + 1, n: g.qs.length });
   return '';
 }
@@ -155,8 +158,22 @@ function drawWordle(body, g) {
     f.appendChild(inp); f.appendChild(go); body.appendChild(f);
   }
 }
+// noms des joueurs ayant choisi cette réponse (-1 = je ne sais pas)
+function quizWho(g, k) {
+  return Object.keys(g.answers || {}).filter(function (c) { return g.answers[c] === k; })
+    .map(function (c) { return (g.pn && g.pn[c]) || '?'; }).join(', ');
+}
 function drawQuiz(body, g, mine) {
   if (g.status === 'over') { body.appendChild(gEl('p', 'gscore', T('scores') + (gScoreText(g) || T('none')))); return; }
+  if (g.status === 'batchdone') {
+    body.appendChild(gEl('p', 'gmsg', T('quiz_batch_done')));
+    var br = gEl('div', 'grow');
+    br.appendChild(gBtn(T('more10'), function () { act({ a: 'more' }); }));
+    br.appendChild(gBtn(T('end_quiz'), function () { act({ a: 'end' }); }));
+    body.appendChild(br);
+    body.appendChild(gEl('p', 'gscore', T('scores') + (gScoreText(g) || T('none'))));
+    return;
+  }
   var Q = g.qs[g.qi], mineA = g.answers[STATE.me];
   var card = gEl('div', 'qcard');
   card.appendChild(gEl('div', 'qprog', T('quiz_q', { i: g.qi + 1, n: g.qs.length })));
@@ -167,9 +184,18 @@ function drawQuiz(body, g, mine) {
     b.disabled = g.revealed || mineA !== undefined;
     if (g.revealed && k === g.correct) b.classList.add('right');
     if (g.revealed && mineA === k && k !== g.correct) b.classList.add('wrong');
-    b.addEventListener('click', function () { act({ a: 'answer', k: k }); });
-    opts.appendChild(b);
+    b.addEventListener('click', function () { act({ a: 'answer', k: k, qi: g.qi }); });
+    var wrap = gEl('div', 'qwrap'); wrap.appendChild(b);
+    var who = quizWho(g, k); if (who) wrap.appendChild(gEl('span', 'qwho', '👥 ' + who));
+    opts.appendChild(wrap);
   });
+  var dk = gEl('button', 'qopt qdk', T('dont_know')); dk.type = 'button';
+  dk.disabled = g.revealed || mineA !== undefined;
+  if (g.revealed && mineA === -1) dk.classList.add('wrong');
+  dk.addEventListener('click', function () { act({ a: 'answer', k: -1, qi: g.qi }); });
+  var dwrap = gEl('div', 'qwrap'); dwrap.appendChild(dk);
+  var dwho = quizWho(g, -1); if (dwho) dwrap.appendChild(gEl('span', 'qwho', '👥 ' + dwho));
+  opts.appendChild(dwrap);
   card.appendChild(opts); body.appendChild(card);
   var qrow = gEl('div', 'grow');
   if (!g.revealed) qrow.appendChild(gBtn(T('reveal'), function () { act({ a: 'reveal' }); }));
@@ -178,7 +204,55 @@ function drawQuiz(body, g, mine) {
   body.appendChild(gEl('p', 'gscore', T('scores') + (gScoreText(g) || T('none'))));
 }
 
-// ---------- choix de la langue (quiz et mot mystère) ----------
+// ---------- coloriage : un tour par joueur, une couleur et une zone à chaque tour ----------
+var PAINT_C = null;
+function drawColor(body, g, mine) {
+  var sub = COLOR_SUBJECTS.filter(function (x) { return x.id === g.subject; })[0];
+  if (!sub) return;
+  var myTurn = g.status === 'play' && mine >= 0 && (g.turn % g.players.length) === mine;
+  var wrap = gEl('div', 'blob colorblob');
+  wrap.innerHTML = '<svg viewBox="0 0 300 300" class="csvg">' + colorMarkup(sub, g.regions) + '</svg>';
+  wrap.querySelectorAll('[data-r]').forEach(function (el) {
+    var i = +el.getAttribute('data-r');
+    if (myTurn && g.regions[i] === null) {
+      el.style.cursor = 'pointer';
+      el.addEventListener('click', function () {
+        if (!PAINT_C) { flash(T('pick_color')); return; }
+        act({ a: 'paint', r: i, c: PAINT_C }); PAINT_C = null;
+      });
+    }
+  });
+  body.appendChild(wrap);
+  if (g.status === 'play' && myTurn) {
+    body.appendChild(gEl('p', 'gscore', T('pick_color')));
+    var pal = gEl('div', 'palette');
+    COLOR_PALETTE.forEach(function (c) {
+      var b = gEl('button', 'swatch' + (PAINT_C === c ? ' on' : '')); b.type = 'button'; b.style.background = c;
+      b.addEventListener('click', function () { PAINT_C = c; renderGame(); });
+      pal.appendChild(b);
+    });
+    body.appendChild(pal);
+  }
+  if (g.status === 'over') body.appendChild(gBtn(T('save_img'), function () { saveColorImage(g, sub); }));
+}
+// sauvegarde l'image terminée au format PNG
+function saveColorImage(g, sub) {
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300"><rect width="300" height="300" fill="#ffffff"/>' +
+    colorMarkup(sub, g.regions).replace(/ data-r="\d+"/g, '') + '</svg>';
+  var img = new Image();
+  img.onload = function () {
+    var cv = document.createElement('canvas'); cv.width = 900; cv.height = 900;
+    cv.getContext('2d').drawImage(img, 0, 0, 900, 900);
+    cv.toBlob(function (blob) {
+      if (!blob) { flash('Sauvegarde impossible sur cet appareil.'); return; }
+      var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'coloriage.png';
+      document.body.appendChild(a); a.click(); a.remove();
+    }, 'image/png');
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+// ---------- choix de la langue (quiz et Lost / The 100) ----------
 function drawPicker(body) {
   body.appendChild(gEl('p', 'gmsg', T('pick_lang')));
   var row = gEl('div', 'menu');
@@ -224,9 +298,10 @@ function renderGame() {
   if (g.type === 'rps') drawRps(body, g, mine);
   if (g.type === 'wordle') drawWordle(body, g);
   if (g.type === 'quiz') drawQuiz(body, g, mine);
+  if (g.type === 'color') drawColor(body, g, mine);
   if (g.msg) body.appendChild(gEl('p', 'gmsg', g.msg));
   var row = gEl('div', 'grow');
-  if (GAME_TWO[g.type] && g.status === 'lobby' && mine < 0) row.appendChild(gBtn(T('join'), function () { act({ a: 'join' }); }));
+  if (((GAME_TWO[g.type] && g.status === 'lobby') || (g.type === 'color' && g.status === 'play')) && mine < 0) row.appendChild(gBtn(g.type === 'color' ? T('color_join') : T('join'), function () { act({ a: 'join' }); }));
   if (mine >= 0 || STATE.host || g.status === 'over') row.appendChild(gBtn(g.status === 'over' ? T('back') : T('stop'), function () { act({ a: 'close' }); }));
   body.appendChild(row);
 }

@@ -820,7 +820,7 @@
   $('q-link').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addLinkToQueue(); } });
   // ---------- jeux à plusieurs : l'hôte garde la partie et valide chaque coup ----------
   var GAME = null, GAME_SECRET = null, GAME_SEQ = 0;
-  var GAME_NAMES = { ttt: 'Morpion', rps: 'Pierre-feuille-ciseaux', wordle: 'Mot mystère', quiz: 'Quiz' };
+  var GAME_NAMES = { ttt: 'Morpion', rps: 'Pierre-feuille-ciseaux', wordle: 'Mot mystère', quiz: 'Quiz', series: 'Quiz Lost / The 100', color: 'Coloriage' };
   var GAME_TWO = { ttt: 1, rps: 1 };
   var RPS_CH = ['Pierre', 'Feuille', 'Ciseaux'];
   var RPS_ICON = { Pierre: '✊', Feuille: '✋', Ciseaux: '✌️' };
@@ -829,16 +829,23 @@
   function gPlayerIndex(g, cid) { if (!g || !g.players) return -1; for (var i = 0; i < g.players.length; i++) if (g.players[i].cid === cid) return i; return -1; }
   function gName(g, i) { return g.players[i] ? g.players[i].name : '?'; }
   function gNew(type, cid, name, lang) {
+    var bank = 'general';
+    if (type === 'series') { type = 'quiz'; bank = 'series'; }
     var g = { id: ++GAME_SEQ, type: type, status: GAME_TWO[type] ? 'lobby' : 'play', players: [{ cid: cid, name: name }], turn: 0, msg: '', lang: (['fr', 'en', 'ar'].indexOf(lang) >= 0 ? lang : 'fr') };
     GAME_SECRET = {};
     if (type === 'ttt') g.board = ['', '', '', '', '', '', '', '', ''];
     if (type === 'rps') { g.score = [0, 0, 0]; g.picked = {}; g.result = null; }
     if (type === 'wordle') { g.rows = []; GAME_SECRET.word = pickWord(g.lang); }
     if (type === 'quiz') {
-      var set = pickQuiz(g.lang, 10);                      // 10 questions tirées au hasard, réponses mélangées
+      var set = pickQuiz(g.lang, 10, bank, []);            // 10 questions tirées au hasard, réponses mélangées
+      g.bank = bank; g.usedQ = set.map(function (x) { return x.q; });
       GAME_SECRET.quiz = set.map(function (x) { return x.a; });
       g.qs = set.map(function (x) { return { q: x.q, c: x.c }; });
       g.qi = 0; g.answers = {}; g.pn = {}; g.scores = {}; g.revealed = false;
+    }
+    if (type === 'color') {                                // image au hasard, zones à colorier
+      var sub = pickColorSubject();
+      g.subject = sub.id; g.regions = sub.parts.map(function () { return null; }); g.turn = 0;
     }
     return g;
   }
@@ -869,7 +876,7 @@
     if (a === 'close') { GAME = null; GAME_SECRET = null; return; }
     if (a === 'join') {
       if (act.gid && act.gid !== g.id) return;
-      if (GAME_TWO[g.type] && g.status === 'lobby' && me < 0) { g.players.push({ cid: cid, name: name }); g.status = 'play'; g.msg = ''; }
+      if (((GAME_TWO[g.type] && g.status === 'lobby') || (g.type === 'color' && g.status === 'play')) && me < 0) { g.players.push({ cid: cid, name: name }); g.status = 'play'; g.msg = ''; }
       return;
     }
     if (g.type === 'ttt' && a === 'move' && g.status === 'play' && me === g.turn) {
@@ -880,6 +887,13 @@
       var ln = gWinLine(g.board);
       if (ln || g.board.every(function (x) { return x; })) { g.status = 'over'; g.winner = ln ? me : -1; g.line = ln; }
       else g.turn = 1 - g.turn;
+      return;
+    }
+    if (g.type === 'color' && a === 'paint' && g.status === 'play' && me >= 0 && me === g.turn % g.players.length) {
+      var pr = act.r | 0;
+      if (pr < 0 || pr >= g.regions.length || g.regions[pr] !== null || COLOR_PALETTE.indexOf(act.c) < 0) return;
+      g.regions[pr] = act.c; g.turn++;                     // au tour suivant : le joueur suivant
+      if (g.regions.every(function (x) { return x !== null; })) g.status = 'over';
       return;
     }
     if (g.type === 'rps' && me >= 0 && g.players.length === 2) {
@@ -909,15 +923,26 @@
     if (g.type === 'quiz') {
       if (a === 'answer' && !g.revealed && g.status === 'play' && g.answers[cid] === undefined) {
         var k = act.k | 0;
-        if (k < 0 || k > 3) return;
+        if (k < -1 || k > 3) return;                       // -1 = je ne sais pas (aucun point)
+        if (act.qi !== undefined && (act.qi | 0) !== g.qi) return;   // réponse d'une question précédente : ignorée
         g.answers[cid] = k; g.pn[cid] = name;
         if (Object.keys(g.answers).length >= Math.max(1, roomCount)) gReveal(g);
         return;
       }
       if (a === 'reveal' && !g.revealed && g.status === 'play') { gReveal(g); return; }
+      if (a === 'more' && g.status === 'batchdone') {
+        var more = pickQuiz(g.lang, 10, g.bank, g.usedQ);  // 10 nouvelles questions, jamais déjà posées
+        if (!more.length) { g.status = 'over'; return; }
+        GAME_SECRET.quiz = GAME_SECRET.quiz.concat(more.map(function (x) { return x.a; }));
+        g.qs = g.qs.concat(more.map(function (x) { return { q: x.q, c: x.c }; }));
+        g.usedQ = g.usedQ.concat(more.map(function (x) { return x.q; }));
+        g.status = 'play'; g.answers = {}; g.revealed = false; delete g.correct;
+        return;
+      }
+      if (a === 'end' && g.status === 'batchdone') { g.status = 'over'; return; }
       if (a === 'nextq' && g.revealed) {
         g.qi++; g.answers = {}; g.revealed = false; delete g.correct;
-        if (g.qi >= g.qs.length) g.status = 'over';
+        if (g.qi >= g.qs.length) g.status = 'batchdone';
       }
     }
   }
@@ -990,7 +1015,7 @@
   function acceptInvite() {
     var g = GAME; if (!g) return;
     seenInvite = g.id; openGames();
-    if (GAME_TWO[g.type] && g.status === 'lobby') gAction({ a: 'join', gid: g.id });
+    if ((GAME_TWO[g.type] && g.status === 'lobby') || g.type === 'color') gAction({ a: 'join', gid: g.id });
     updateInvite();
   }
   function declineInvite() { if (GAME) seenInvite = GAME.id; updateInvite(); }
