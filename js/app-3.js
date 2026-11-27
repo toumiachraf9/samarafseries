@@ -860,7 +860,7 @@
     return r;
   }
   function gReveal(g) {
-    var ans = GAME_SECRET.quiz[g.qi]; g.revealed = true; g.correct = ans;
+    var ans = GAME_SECRET.quiz[g.qi]; g.revealed = true; g.correct = ans; delete g.warn;
     Object.keys(g.answers).forEach(function (k) { if (g.answers[k] === ans) g.scores[k] = (g.scores[k] || 0) + 1; });
   }
   // seul l'hôte exécute ceci : il valide le coup puis diffuse l'état
@@ -891,7 +891,7 @@
     }
     if (g.type === 'color' && a === 'nextimg' && g.status === 'over' && me >= 0) {   // nouvelle image, mêmes joueurs
       var others = COLOR_SUBJECTS.filter(function (x) { return x.id !== g.subject; });
-      var nsub = others[Math.floor(Math.random() * others.length)] || pickColorSubject();
+      var nsub = others[gRand(others.length)] || pickColorSubject();
       g.subject = nsub.id; g.regions = nsub.parts.map(function () { return null; }); g.status = 'play'; g.last = null;
       return;
     }
@@ -932,27 +932,61 @@
         if (k < -1 || k > 3) return;                       // -1 = je ne sais pas (aucun point)
         if (act.qi !== undefined && (act.qi | 0) !== g.qi) return;   // réponse d'une question précédente : ignorée
         g.answers[cid] = k; g.pn[cid] = name;
-        if (Object.keys(g.answers).length >= Math.max(1, roomCount)) gReveal(g);
+        if (gAllAnswered(g)) gReveal(g);
         return;
       }
-      if (a === 'reveal' && !g.revealed && g.status === 'play') { gReveal(g); return; }
       if (a === 'more' && g.status === 'batchdone') {
         var more = pickQuiz(g.lang, 10, g.bank, g.usedQ);  // 10 nouvelles questions, jamais déjà posées
         if (!more.length) { g.status = 'over'; return; }
         GAME_SECRET.quiz = GAME_SECRET.quiz.concat(more.map(function (x) { return x.a; }));
         g.qs = g.qs.concat(more.map(function (x) { return { q: x.q, c: x.c }; }));
         g.usedQ = g.usedQ.concat(more.map(function (x) { return x.q; }));
-        g.status = 'play'; g.answers = {}; g.revealed = false; delete g.correct;
+        g.status = 'play'; g.answers = {}; g.revealed = false; delete g.correct; delete g.warn;
         return;
       }
       if (a === 'end' && g.status === 'batchdone') { g.status = 'over'; return; }
       if (a === 'nextq' && g.revealed) {
-        g.qi++; g.answers = {}; g.revealed = false; delete g.correct;
+        g.qi++; g.answers = {}; g.revealed = false; delete g.correct; delete g.warn;
         if (g.qi >= g.qs.length) g.status = 'batchdone';
       }
     }
   }
-  function gBroadcast() { broadcast({ t: 'gstate', g: GAME }); renderGame(); }
+  // ---- qui doit répondre : seulement les personnes présentes (quelqu'un qui est parti n'est plus attendu) ----
+  var GAME_WARN_AFTER = 60000, GAME_WARN_MS = 30000;   // après 1 min sans réponse d'un joueur, un compte à rebours s'affiche (30 s), puis la question est révélée
+  function gAllAnswered(g) {
+    var cons = openConns(), ids = [gameId], seen = {}, known = true;
+    seen[gameId] = 1;
+    cons.forEach(function (c) { if (!c.gid) known = false; else if (!seen[c.gid]) { seen[c.gid] = 1; ids.push(c.gid); } });
+    if (!known) return Object.keys(g.answers).length >= Math.max(1, roomCount);   // anciens appareils sans identifiant : décompte simple
+    return ids.every(function (id) { return g.answers[id] !== undefined; });
+  }
+  // un joueur vient de partir : s'il était le dernier à ne pas avoir répondu, on révèle tout de suite
+  function gCheckAll() {
+    if (!GAME || GAME.type !== 'quiz' || GAME.status !== 'play' || GAME.revealed) return;
+    if (gAllAnswered(GAME)) { gReveal(GAME); gBroadcast(); }
+  }
+  var gT1 = null, gT2 = null, gTimerKey = '';
+  function gSyncTimer() {
+    var key = (GAME && GAME.type === 'quiz' && GAME.status === 'play' && !GAME.revealed) ? GAME.id + ':' + GAME.qi : '';
+    if (key === gTimerKey) return;
+    gTimerKey = key; clearTimeout(gT1); clearTimeout(gT2); gT1 = gT2 = null;
+    if (!key) return;
+    var id = GAME.id, qi = GAME.qi;
+    function same() { return GAME && GAME.id === id && GAME.qi === qi && GAME.status === 'play' && !GAME.revealed; }
+    gT1 = setTimeout(function () {
+      if (!same()) return;
+      GAME.warn = GAME_WARN_MS; gBroadcast();                  // le compte à rebours apparaît chez tout le monde
+      gT2 = setTimeout(function () { if (same()) { gReveal(GAME); gBroadcast(); } }, GAME_WARN_MS);
+    }, GAME_WARN_AFTER);
+  }
+  // ce que les amis reçoivent : tant que la question n'est pas révélée, on n'envoie que QUI a répondu, jamais QUOI
+  function gView() {
+    if (!GAME || GAME.type !== 'quiz' || GAME.revealed || !GAME.answers) return GAME;
+    var v = Object.assign({}, GAME), hid = {};
+    Object.keys(GAME.answers).forEach(function (k) { hid[k] = true; });
+    v.answers = hid; return v;
+  }
+  function gBroadcast() { gSyncTimer(); broadcast({ t: 'gstate', g: gView() }); renderGame(); }
   // une action vient de cette personne : l'hôte l'applique directement, les autres l'envoient à l'hôte
   function gAction(act) {
     if (isHost) { gApply(act, gameId, myName); gBroadcast(); }
@@ -1096,14 +1130,16 @@
       var same = (lastWho === key);       // même personne que le message précédent : le nom n'est pas répété
       lastWho = key;
       if (same) el.classList.add('cont');
-      else {
+      var head = document.createElement('div'); head.className = 'mhead';   // nom + heure sur la même ligne
+      if (!same) {
         var w = document.createElement('span'); w.className = 'who'; w.textContent = who;
-        el.appendChild(w);
+        head.appendChild(w);
       }
       var tm = document.createElement('span'); tm.className = 'time';
       var when = ts && isFinite(+ts) ? new Date(+ts) : new Date();
       tm.textContent = when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      el.appendChild(tm);
+      head.appendChild(tm);
+      el.appendChild(head);
       var t = document.createElement('span'); t.className = 'txt'; renderText(t, text);
       if (EMOJI_ONLY.test(text)) el.classList.add('big');
       el.appendChild(t);
@@ -1219,7 +1255,7 @@
     if (!isHost || !peer || !openConns().length) return;
     updateStatus();
     broadcast({ t: 'count', n: roomCount, names: memberNames() });
-      if (isHost && GAME) broadcast({ t: 'gstate', g: GAME });   // la salle renvoie l'état : aucun ami ne reste bloqué
+      if (isHost && GAME) broadcast({ t: 'gstate', g: gView() });   // la salle renvoie l'état : aucun ami ne reste bloqué
   }, 3000);
   function setDrop(title, text, showPick, progress) {
     $('drop').hidden = false;
@@ -1262,7 +1298,7 @@
     try { c.close(); } catch (e) {}
     delete typers[c.cid]; renderTyping();
     updateStatus();
-    if (isHost) renderQ();
+    if (isHost) { renderQ(); gCheckAll(); }
     if (rtcBroadcaster) rtcBroadcaster.removeViewer(c.peer);
     if (isHost && sendConn[c.peer]) { sendConn[c.peer].dead = true; try { sendConn[c.peer].close(); } catch (e) {} }
     // connexion jamais ouverte, remplacée par une reconnexion de la même personne, ou onglet remplacé : pas un vrai départ
@@ -1291,7 +1327,7 @@
         lostShown = false;
       }
       updateStatus();
-      c.send({ t: 'hello', name: myName, cid: myCid, q: myQ, a: myA, code: isHost ? '' : roomCode });
+      c.send({ t: 'hello', name: myName, cid: myCid, gid: gameId, q: myQ, a: myA, code: isHost ? '' : roomCode });
     });
     c.on('data', function (d) { c.lastSeen = Date.now(); handle(d, c); });
     c.on('close', function () { dropConn(c); });
@@ -1304,7 +1340,7 @@
   // envoyé à l'autre dès que son 'hello' est reçu (on connaît alors son identifiant et ce qu'il possède déjà)
   function welcome(c, d) {
     if (isHost) c.send({ t: 'mode', m: roomMode });
-    if (isHost) c.send({ t: 'gstate', g: GAME });
+    if (isHost) c.send({ t: 'gstate', g: gView() });
     if (localFile) {
       if (d.q && QUALS[d.q]) qFor[c.peer] = d.q;                              // qualité choisie par cette personne
       if (d.a && AUDIO[d.a]) aFor[c.peer] = d.a;                              // son choisi par cette personne
@@ -1334,7 +1370,7 @@
           setTimeout(function () { dropConn(c, true); }, 400);
           return;
         }
-        c.peerName = d.name; c.cid = d.cid;
+        c.peerName = d.name; c.cid = d.cid; c.gid = String(d.gid || '').slice(0, 40);
         if (isHost) { hadGuest = true; emptySince = 0; }
         if (isHost) { c.q = QUALS[d.q] ? d.q : DEF_Q; renderQ(); }
         // même personne qui revient (actualisation, reconnexion) : l'ancienne connexion est retirée, elle n'est pas comptée en double

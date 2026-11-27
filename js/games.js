@@ -60,7 +60,9 @@ function pendingDone(a) {
   if (a.a === 'paint') return !!(g.regions && g.regions[a.r] !== null);
   return true;
 }
+var MY_ANS = null;                                // mon choix à la question en cours (les réponses des autres restent cachées jusqu'à la révélation)
 function act(a) {
+  if (a.a === 'answer' && STATE.g) MY_ANS = { id: STATE.g.id, qi: a.qi, k: a.k };
   sendAct(a);
   if (['pick', 'join', 'answer', 'move', 'paint'].indexOf(a.a) < 0) return;
   PENDING = a; PENDING_TRIES = 0; clearInterval(PENDING_T);
@@ -158,51 +160,168 @@ function drawWordle(body, g) {
     f.appendChild(inp); f.appendChild(go); body.appendChild(f);
   }
 }
-// noms des joueurs ayant choisi cette réponse (-1 = je ne sais pas)
+// noms des joueurs ayant choisi cette réponse (-1 = je ne sais pas) : seulement après la révélation
 function quizWho(g, k) {
+  if (!g.revealed) return '';
   return Object.keys(g.answers || {}).filter(function (c) { return g.answers[c] === k; })
     .map(function (c) { return (g.pn && g.pn[c]) || '?'; }).join(', ');
 }
+// mon choix : jamais celui des autres avant que tout le monde ait répondu
+function quizMine(g) {
+  var v = g.answers && g.answers[STATE.me];
+  if (typeof v === 'number') return v;
+  if (v !== undefined && MY_ANS && MY_ANS.id === g.id && MY_ANS.qi === g.qi) return MY_ANS.k;
+  return v !== undefined ? -2 : undefined;           // -2 : j'ai répondu, choix inconnu de cet écran
+}
+// ---------- affichage du quiz : couleurs, animations, retour sur la réponse ----------
+var QSHAPE = ['▲', '◆', '●', '■'];
+var QLET = ['A', 'B', 'C', 'D'];
+var FX = { q: '', r: '', gid: 0, streak: 0, t: '', t0: 0 };         // pour ne jouer chaque animation qu'une seule fois
+function nameColor(n) { var h = 0; String(n).split('').forEach(function (ch) { h = (h * 31 + ch.charCodeAt(0)) % 360; }); return 'hsl(' + h + ',62%,52%)'; }
+function chip(name, extra) {
+  var c = gEl('span', 'pchip' + (extra ? ' ' + extra : ''));
+  var av = gEl('i', 'pav', (Array.from(name || '?')[0] || '?').toUpperCase()); av.style.background = nameColor(name);
+  c.appendChild(av); c.appendChild(gEl('span', 'pnm', name)); return c;
+}
+function confetti(host) {
+  var cols = ['#ffb347', '#2eaf62', '#2d7dd2', '#e2445c', '#f2b705', '#a57bd9'];
+  var layer = gEl('div', 'fxlayer');
+  for (var i = 0; i < 30; i++) {
+    var p = gEl('i', 'conf');
+    p.style.left = (10 + Math.random() * 80) + '%'; p.style.background = cols[i % cols.length];
+    p.style.setProperty('--dx', ((Math.random() - .5) * 220) + 'px'); p.style.setProperty('--rot', (Math.random() * 720 - 360) + 'deg');
+    p.style.animationDelay = (Math.random() * 120) + 'ms'; layer.appendChild(p);
+  }
+  host.appendChild(layer); setTimeout(function () { if (layer.parentNode) layer.parentNode.removeChild(layer); }, 1900);
+}
+// tableau des scores : classé, avec médailles et « +1 » de la question qui vient d'être révélée
+function drawBoard(body, g, gained) {
+  var ids = Object.keys(g.pn || {});
+  if (!ids.length) return;
+  ids.sort(function (x, y) { return (g.scores[y] || 0) - (g.scores[x] || 0); });
+  var box = gEl('div', 'board');
+  var medals = ['🥇', '🥈', '🥉'];
+  ids.forEach(function (c, i) {
+    var row = gEl('div', 'brow' + (c === STATE.me ? ' me' : ''));
+    row.appendChild(gEl('span', 'brank', medals[i] || String(i + 1)));
+    row.appendChild(chip(g.pn[c]));
+    var sc = gEl('b', 'bscore', String(g.scores[c] || 0)); row.appendChild(sc);
+    if (gained && gained[c]) row.appendChild(gEl('span', 'bplus', '+1'));
+    box.appendChild(row);
+  });
+  body.appendChild(box);
+}
 function drawQuiz(body, g, mine) {
-  if (g.status === 'over') { body.appendChild(gEl('p', 'gscore', T('scores') + (gScoreText(g) || T('none')))); return; }
-  if (g.status === 'batchdone') {
-    body.appendChild(gEl('p', 'gmsg', T('quiz_batch_done')));
-    var br = gEl('div', 'grow');
-    br.appendChild(gBtn(T('more10'), function () { act({ a: 'more' }); }));
-    br.appendChild(gBtn(T('end_quiz'), function () { act({ a: 'end' }); }));
-    body.appendChild(br);
-    body.appendChild(gEl('p', 'gscore', T('scores') + (gScoreText(g) || T('none'))));
+  if (g.id !== FX.gid) { FX = { q: '', r: '', gid: g.id, streak: 0, t: '', t0: 0 }; }
+  if (g.status === 'over' || g.status === 'batchdone') {
+    var fin = gEl('div', 'qend');
+    if (g.status === 'over') fin.appendChild(gEl('div', 'qtrophy', '🏆'));
+    fin.appendChild(gEl('p', 'gmsg', g.status === 'over' ? T('quiz_done') : T('quiz_batch_done')));
+    body.appendChild(fin);
+    drawBoard(body, g);
+    if (g.status === 'batchdone') {
+      var br = gEl('div', 'grow');
+      br.appendChild(gBtn(T('more10'), function () { act({ a: 'more' }); }));
+      br.appendChild(gBtn(T('end_quiz'), function () { act({ a: 'end' }); }));
+      body.appendChild(br);
+    }
     return;
   }
-  var Q = g.qs[g.qi], mineA = g.answers[STATE.me];
-  var card = gEl('div', 'qcard');
-  card.appendChild(gEl('div', 'qprog', T('quiz_q', { i: g.qi + 1, n: g.qs.length })));
+  var Q = g.qs[g.qi], mineA = quizMine(g);
+  var qkey = g.id + ':' + g.qi, newQ = FX.q !== qkey; FX.q = qkey;
+  var rkey = g.revealed ? qkey : '', newR = !!rkey && FX.r !== rkey; if (rkey) FX.r = rkey;
+  var iRight = g.revealed && mineA === g.correct, iNone = g.revealed && (mineA === undefined || mineA === -1 || mineA === -2);
+  if (newR) {
+    FX.streak = iRight ? FX.streak + 1 : 0;
+    try { if (navigator.vibrate) navigator.vibrate(iRight ? [30, 40, 30] : 120); } catch (e) {}
+  }
+  var gained = null;
+  if (g.revealed) { gained = {}; Object.keys(g.answers || {}).forEach(function (c) { if (g.answers[c] === g.correct) gained[c] = 1; }); }
+
+  var card = gEl('div', 'qcard qv2' + (newQ ? ' enter' : '') + (newR ? (iRight ? ' fxright' : ' fxwrong') : ''));
+  var top = gEl('div', 'qtop');
+  top.appendChild(gEl('span', 'qbadge', T('quiz_q', { i: g.qi + 1, n: g.qs.length })));
+  if (FX.streak >= 2 && g.revealed) top.appendChild(gEl('span', 'qstreak', '🔥 ' + T('fx_streak', { n: FX.streak })));
+  card.appendChild(top);
+  var bar = gEl('div', 'qbar'), fill = gEl('i', ''); fill.style.width = (((g.qi + (g.revealed ? 1 : 0)) / g.qs.length) * 100) + '%'; bar.appendChild(fill); card.appendChild(bar);
   card.appendChild(gEl('p', 'qq', Q.q));
+
   var opts = gEl('div', 'qopts');
+  var answered = mineA !== undefined;
   Q.c.forEach(function (txt, k) {
-    var b = gEl('button', 'qopt q' + k, (k + 1) + '  ' + txt); b.type = 'button';
-    b.disabled = g.revealed || mineA !== undefined;
-    if (g.revealed && k === g.correct) b.classList.add('right');
-    if (g.revealed && mineA === k && k !== g.correct) b.classList.add('wrong');
+    var b = gEl('button', 'qopt q' + k); b.type = 'button';
+    b.appendChild(gEl('span', 'qico', g.revealed && k === g.correct ? '✓' : (g.revealed && mineA === k ? '✗' : QSHAPE[k])));
+    b.appendChild(gEl('span', 'qtxt', txt));
+    b.disabled = g.revealed || answered;
+    if (newQ) b.style.animationDelay = (k * 70) + 'ms';
+    if (!g.revealed && mineA === k) b.classList.add('mine');
+    if (!g.revealed && answered && mineA !== k) b.classList.add('dim');
+    if (g.revealed) {
+      if (k === g.correct) b.classList.add('right'); else if (mineA === k) b.classList.add('wrong'); else b.classList.add('dim');
+    }
     b.addEventListener('click', function () { act({ a: 'answer', k: k, qi: g.qi }); });
     var wrap = gEl('div', 'qwrap'); wrap.appendChild(b);
     var who = quizWho(g, k); if (who) wrap.appendChild(gEl('span', 'qwho', '👥 ' + who));
     opts.appendChild(wrap);
   });
-  var dk = gEl('button', 'qopt qdk', T('dont_know')); dk.type = 'button';
-  dk.disabled = g.revealed || mineA !== undefined;
-  if (g.revealed && mineA === -1) dk.classList.add('wrong');
+  var dk = gEl('button', 'qopt qdk'); dk.type = 'button';
+  dk.appendChild(gEl('span', 'qico', '🤷')); dk.appendChild(gEl('span', 'qtxt', T('dont_know')));
+  dk.disabled = g.revealed || answered;
+  if (!g.revealed && mineA === -1) dk.classList.add('mine');
+  if (!g.revealed && answered && mineA !== -1) dk.classList.add('dim');
+  if (g.revealed) dk.classList.add(mineA === -1 ? 'wrong' : 'dim');
   dk.addEventListener('click', function () { act({ a: 'answer', k: -1, qi: g.qi }); });
-  var dwrap = gEl('div', 'qwrap'); dwrap.appendChild(dk);
+  var dwrap = gEl('div', 'qwrap qwide'); dwrap.appendChild(dk);
   var dwho = quizWho(g, -1); if (dwho) dwrap.appendChild(gEl('span', 'qwho', '👥 ' + dwho));
   opts.appendChild(dwrap);
-  card.appendChild(opts); body.appendChild(card);
+  card.appendChild(opts);
+
+  if (g.revealed) {                                    // retour sur ma réponse
+    var fb = gEl('div', 'qfb ' + (iRight ? 'good' : (iNone ? 'none' : 'bad')) + (newR ? ' pop' : ''));
+    fb.appendChild(gEl('span', 'qfbico', iRight ? '🎉' : (iNone ? '🤔' : '😅')));
+    var tx = gEl('div', 'qfbtx');
+    tx.appendChild(gEl('b', '', iRight ? T('fx_right') : (iNone ? T('fx_none') : T('fx_wrong'))));
+    if (!iRight) tx.appendChild(gEl('span', '', T('fx_was', { a: Q.c[g.correct] })));
+    else tx.appendChild(gEl('span', '', '+1'));
+    fb.appendChild(tx); card.appendChild(fb);
+    if (newR && iRight) confetti(card);
+  } else {                                             // attente : qui a répondu (pas quoi)
+    if (g.warn) {                                      // 1 min sans réponse de quelqu'un : compte à rebours visible
+      if (FX.t !== qkey) { FX.t = qkey; FX.t0 = Date.now(); }
+      var cd = gEl('div', 'qtimer'); cd.setAttribute('data-ms', String(g.warn)); cd.setAttribute('data-t0', String(FX.t0));
+      cd.appendChild(gEl('span', 'qtico', '⏱'));
+      cd.appendChild(gEl('b', 'qtnum', Math.ceil(Math.max(0, g.warn - (Date.now() - FX.t0)) / 1000) + ' s'));
+      card.appendChild(cd);
+    }
+    var done = Object.keys(g.answers || {});
+    if (answered) {
+      var w = gEl('div', 'qwait'); w.appendChild(gEl('span', 'qdots', '●●●')); w.appendChild(gEl('span', '', T('waiting')));
+      card.appendChild(w);
+    }
+    var cr = gEl('div', 'qchips');
+    done.forEach(function (c) { cr.appendChild(chip((g.pn && g.pn[c]) || '?', 'pop')); });
+    if (!done.length) cr.appendChild(gEl('span', 'qnone', T('no_answer_yet')));
+    card.appendChild(cr);
+  }
+  body.appendChild(card);
+
   var qrow = gEl('div', 'grow');
-  if (!g.revealed) qrow.appendChild(gBtn(T('reveal'), function () { act({ a: 'reveal' }); }));
-  else qrow.appendChild(gBtn(g.qi + 1 < g.qs.length ? T('next_q') : T('see_result'), function () { act({ a: 'nextq' }); }));
+  if (g.revealed) {                                   // pas de bouton « Révéler » : les réponses s'affichent quand tout le monde a répondu
+
+    var nb = gBtn(g.qi + 1 < g.qs.length ? T('next_q') : T('see_result'), function () { act({ a: 'nextq' }); });
+    nb.classList.add('primary', 'qnext'); qrow.appendChild(nb);
+  }
   body.appendChild(qrow);
-  body.appendChild(gEl('p', 'gscore', T('scores') + (gScoreText(g) || T('none'))));
+  drawBoard(body, g, newR ? gained : null);
 }
+
+// décompte du minuteur (sans redessiner l'écran)
+setInterval(function () {
+  var el = document.querySelector('.qtimer'); if (!el) return;
+  var left = Math.max(0, (+el.getAttribute('data-ms')) - (Date.now() - (+el.getAttribute('data-t0'))));
+  var n = el.querySelector('.qtnum'); if (n) n.textContent = Math.ceil(left / 1000) + ' s';
+  el.classList.toggle('low', left <= 10000);
+}, 250);
 
 // ---------- coloriage : un tour par joueur, une couleur et une zone à chaque tour ----------
 var PAINT_C = null;
@@ -298,7 +417,7 @@ function renderGame() {
   }
   var g = STATE.g, mine = gPlayerIndex(g, STATE.me);
   title.textContent = T('name_' + g.type);
-  body.appendChild(gEl('p', 'gmsg', gStatus(g, mine)));
+  if (!(g.type === 'quiz' && g.status === 'play')) body.appendChild(gEl('p', 'gmsg', gStatus(g, mine)));   // le quiz affiche déjà « Question i / n » dans sa carte
   if (g.type === 'ttt') drawTtt(body, g, mine);
   if (g.type === 'rps') drawRps(body, g, mine);
   if (g.type === 'wordle') drawWordle(body, g);
