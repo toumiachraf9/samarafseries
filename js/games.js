@@ -233,7 +233,12 @@ function drawColor(body, g, mine) {
     });
     body.appendChild(pal);
   }
-  if (g.status === 'over') body.appendChild(gBtn(T('save_img'), function () { saveColorImage(g, sub); }));
+  if (g.status === 'over') {
+    var crow = gEl('div', 'grow');
+    crow.appendChild(gBtn(T('save_img'), function () { saveColorImage(g, sub); }));
+    crow.appendChild(gBtn(T('next_img'), function () { PAINT_C = null; act({ a: 'nextimg' }); }));
+    body.appendChild(crow);
+  }
 }
 // sauvegarde l'image terminée au format PNG
 function saveColorImage(g, sub) {

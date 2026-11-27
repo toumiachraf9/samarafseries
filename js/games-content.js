@@ -1152,6 +1152,68 @@ var COLOR_SUBJECTS = [
     '<rect x="190" y="110" width="60" height="110" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
     '<rect x="95" y="175" width="95" height="40" rx="8" fill="{F}" stroke="#2b3d55" stroke-width="4"/>'
   ] },
+  { id: 'elephant', parts: [
+    '<ellipse cx="160" cy="170" rx="90" ry="58" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="88" y="200" width="28" height="72" rx="13" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="122" y="200" width="28" height="72" rx="13" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="188" y="200" width="28" height="72" rx="13" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="222" y="200" width="28" height="72" rx="13" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<ellipse cx="108" cy="112" rx="34" ry="44" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<ellipse cx="92" cy="118" rx="50" ry="46" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<path d="M52 128 Q22 150 28 200 Q32 216 46 204 Q42 168 66 150 Z" fill="{F}" stroke="#2b3d55" stroke-width="4" stroke-linejoin="round"/>',
+    '<path d="M54 134 Q34 136 38 156 Q50 146 58 146 Z" fill="{F}" stroke="#2b3d55" stroke-width="3" stroke-linejoin="round"/>',
+    '<circle cx="84" cy="104" r="6" fill="{F}" stroke="#2b3d55" stroke-width="3"/>',
+    '<path d="M246 150 Q266 158 262 186 L256 184 Q258 164 240 158 Z" fill="{F}" stroke="#2b3d55" stroke-width="3" stroke-linejoin="round"/>'
+  ] },
+  { id: 'bird', parts: [
+    '<ellipse cx="150" cy="170" rx="70" ry="85" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<path d="M220 190 L262 240 L226 246 L210 214 Z" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<path d="M96 150 Q118 130 128 190 Q108 216 88 190 Z" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<circle cx="150" cy="95" r="55" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<circle cx="132" cy="90" r="16" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<circle cx="168" cy="90" r="16" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<polygon points="150,110 140,130 160,130" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<polygon points="122,52 130,20 142,50" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<polygon points="158,50 170,20 178,52" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="120" y="250" width="16" height="24" rx="4" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="164" y="250" width="16" height="24" rx="4" fill="{F}" stroke="#2b3d55" stroke-width="4"/>'
+  ] },
+  { id: 'house', parts: [
+    '<rect x="0" y="262" width="300" height="38" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="60" y="120" width="180" height="142" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<polygon points="40,125 150,40 260,125" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="200" y="55" width="25" height="50" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="130" y="180" width="40" height="82" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<circle cx="162" cy="222" r="4" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="78" y="150" width="40" height="40" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="182" y="150" width="40" height="40" fill="{F}" stroke="#2b3d55" stroke-width="4"/>'
+  ] },
+  { id: 'tree', parts: [
+    '<rect x="0" y="250" width="300" height="50" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="130" y="170" width="40" height="90" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<circle cx="150" cy="120" r="70" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<circle cx="95" cy="150" r="45" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<circle cx="205" cy="150" r="45" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<circle cx="120" cy="110" r="10" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<circle cx="185" cy="130" r="10" fill="{F}" stroke="#2b3d55" stroke-width="4"/>'
+  ] },
+  { id: 'car', parts: [
+    '<path d="M40 200 L40 160 Q45 140 80 135 L110 105 Q130 95 190 95 L225 125 Q255 130 262 160 L262 200 Z" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<polygon points="118,110 185,110 208,138 115,138" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<circle cx="95" cy="205" r="28" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<circle cx="215" cy="205" r="28" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<circle cx="95" cy="205" r="10" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<circle cx="215" cy="205" r="10" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<circle cx="252" cy="165" r="8" fill="{F}" stroke="#2b3d55" stroke-width="4"/>'
+  ] },
+  { id: 'boat', parts: [
+    '<rect x="0" y="230" width="300" height="70" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<path d="M60 230 L240 230 L210 265 L90 265 Z" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<rect x="145" y="40" width="8" height="190" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<polygon points="155,50 155,215 230,215" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<polygon points="140,70 140,215 70,215" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
+    '<polygon points="153,40 178,50 153,60" fill="{F}" stroke="#2b3d55" stroke-width="4"/>'
+  ] },
   { id: 'mug', parts: [
     '<rect x="70" y="80" width="130" height="150" rx="14" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
     '<path d="M200 110 h25 a35 35 0 0 1 0 70 h-25" fill="{F}" stroke="#2b3d55" stroke-width="4"/>',
@@ -1181,4 +1243,7 @@ Object.keys({fr:1,en:1,ar:1}).forEach(function (l) {
     more10: { fr: 'Continuer (10 de plus)', en: 'Continue (10 more)', ar: 'متابعة (10 أسئلة أخرى)' }[l],
     end_quiz: { fr: 'Terminer le quiz', en: 'End the quiz', ar: 'إنهاء المسابقة' }[l]
   });
+});
+Object.keys({fr:1,en:1,ar:1}).forEach(function (l) {
+  GAME_T[l].next_img = { fr: 'Image suivante', en: 'Next picture', ar: 'الصورة التالية' }[l];
 });

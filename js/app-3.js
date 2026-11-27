@@ -889,6 +889,12 @@
       else g.turn = 1 - g.turn;
       return;
     }
+    if (g.type === 'color' && a === 'nextimg' && g.status === 'over' && me >= 0) {   // nouvelle image, mêmes joueurs
+      var others = COLOR_SUBJECTS.filter(function (x) { return x.id !== g.subject; });
+      var nsub = others[Math.floor(Math.random() * others.length)] || pickColorSubject();
+      g.subject = nsub.id; g.regions = nsub.parts.map(function () { return null; }); g.status = 'play'; g.last = null;
+      return;
+    }
     if (g.type === 'color' && a === 'paint' && g.status === 'play' && me >= 0 && me === g.turn % g.players.length) {
       var pr = act.r | 0;
       if (pr < 0 || pr >= g.regions.length || g.regions[pr] !== null || COLOR_PALETTE.indexOf(act.c) < 0) return;
