@@ -1147,6 +1147,7 @@
   }
   $('g-chat-toggle').addEventListener('click', function () {
     gcOpen = !gcOpen; $('gchat').hidden = !gcOpen;
+    if (gcOpen) { gcUnread = 0; gcBadge(); }
     $('g-chat-toggle').textContent = gcOpen ? GT(curLang, 'chat_close') : GT(curLang, 'chat_btn');
     if (gcOpen) gcRebuild();
   });
@@ -1285,6 +1286,7 @@
     if ('Notification' in window && Notification.permission === 'default') { try { Notification.requestPermission(); } catch (e) {} }
     try { getAudio(); } catch (e) {}
   });
+  var gToastTimer = null;
   function showToast(who, text) {
     var t = $('toast');
     t.textContent = '';
@@ -1293,7 +1295,20 @@
     t.hidden = false;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { t.hidden = true; }, 5000);
+    // même alerte à l'intérieur de la fenêtre des jeux
+    var gt = $('gtoast');
+    if (gt) {
+      gt.textContent = '';
+      var gb = document.createElement('b'); gb.textContent = who + ' : ';
+      gt.appendChild(gb); gt.appendChild(document.createTextNode(text));
+      gt.hidden = false;
+      clearTimeout(gToastTimer);
+      gToastTimer = setTimeout(function () { gt.hidden = true; }, 5000);
+    }
   }
+  // compteur rouge des messages non lus sur le bouton Chat (fenêtre des jeux)
+  var gcUnread = 0;
+  function gcBadge() { var bd = $('gbadge'); if (!bd) return; bd.textContent = String(gcUnread); bd.hidden = gcUnread === 0; }
   function openConns() { return conns.filter(function (c) { return c.open; }); }
   // le nombre de spectateurs n'est affiché que chez l'hôte (celui qui a créé la salle)
   var roomCount = 0;   // nombre de personnes dans la salle (hôte compris), annoncé par l'hôte toutes les 3 s
@@ -1512,11 +1527,13 @@
         if (typeof d.text !== 'string') break;
         if (d.mid) { if (seenMids[d.mid]) break; seenMids[d.mid] = 1; }
         if (isHost) pushHistory(d.mid, d.name, d.text, d.cid, d.ts);
+        if (!gcOpen) { gcUnread++; gcBadge(); }
         addMsg(String(d.name || '').slice(0, 20), d.text.slice(0, 500), '', d.ts); tagMsg(d.mid); showToast(String(d.name || '').slice(0, 20), d.text.slice(0, 500)); notifyNew(String(d.name || 'Ami').slice(0, 20), d.text.slice(0, 120)); break;
       case 'img':
         if (typeof d.data !== 'string' || !/^data:image\/(jpeg|png|webp|gif);base64,/.test(d.data) || d.data.length > 600000) break;
         if (d.mid) { if (seenMids[d.mid]) break; seenMids[d.mid] = 1; }
         var imName = String(d.name || '').slice(0, 20);
+        if (!gcOpen) { gcUnread++; gcBadge(); }
         addImgMsg(imName, d.data, ''); showToast(imName, 'a envoyé une photo'); notifyNew(imName || 'Ami', '📷 Photo'); break;
       case 'history':
         if (isHost || !Array.isArray(d.msgs)) break;

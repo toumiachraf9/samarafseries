@@ -649,6 +649,8 @@
   .gchat-log { height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 4px; }
   .gchat-form { display: flex; gap: 8px; margin-top: 8px; }
   .gchat-form input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); }
+  .gbadge { display: inline-block; min-width: 18px; padding: 0 6px; margin-inline-start: 6px; border-radius: 999px; background: #e5484d; color: #ffffff; font-weight: 800; font-size: 12px; line-height: 18px; text-align: center; }
+  .gbadge[hidden] { display: none; }
   .btn.right { border-color: #2e9e4f; }
   .btn.wrong { border-color: #c44; }
   .rbar { display: flex; gap: 4px; margin-top: 4px; }
@@ -924,7 +926,8 @@
           <ul class="qlist" id="qlist"></ul>
         </div>
         <div class="gbox" id="gbox" hidden><header class="ghead"><b id="gtitle">Jeux</b><button class="btn small" id="g-music" type="button" title="Musique">🔊</button><button class="btn small" id="g-close" type="button">Fermer</button></header><main id="gbody"></main>
-          <div class="gchatbar"><button class="btn small" id="g-chat-toggle" type="button">💬 Chat</button></div>
+          <div class="toast" id="gtoast" hidden></div>
+          <div class="gchatbar"><button class="btn small" id="g-chat-toggle" type="button">💬 Chat <span class="gbadge" id="gbadge" hidden>0</span></button></div>
           <div class="gchat" id="gchat" hidden><div class="gchat-log" id="gchat-log"></div><form class="gchat-form" id="gchat-form"><input id="gchat-in" type="text" maxlength="500" autocomplete="off" placeholder="Message…"><button class="btn small primary" type="submit">OK</button></form></div></div>
                         <div class="ginvite" id="ginvite" hidden><div class="gi-card"><div class="gi-icon">🎲</div><p class="gi-text" id="ginvite-text"></p><div class="gi-btns"><button class="btn primary" id="ginvite-yes" type="button">Accepter</button><button class="btn" id="ginvite-no" type="button">Refuser</button></div></div></div>
         <div class="tap" id="tap" hidden>
@@ -1121,7 +1124,7 @@
 <script src="js/games-q-series.js?v=2"></script>
 <script src="js/games-q-artrivia.js?v=2"></script>
 <script src="js/games.js?v=36"></script>
-<script src="js/app-3.js?v=33"></script>
+<script src="js/app-3.js?v=34"></script>
 <script type="module" src="js/app-4-module.js"></script>
 </body>
 </html>
