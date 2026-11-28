@@ -820,14 +820,31 @@
   $('q-link').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addLinkToQueue(); } });
   // ---------- jeux à plusieurs : l'hôte garde la partie et valide chaque coup ----------
   var GAME = null, GAME_SECRET = null, GAME_SEQ = 0;
-  var GAME_NAMES = { ttt: 'Morpion', rps: 'Pierre-feuille-ciseaux', wordle: 'Mot mystère', quiz: 'Quiz', series: 'Quiz Lost / The 100', color: 'Coloriage' };
-  var GAME_TWO = { ttt: 1, rps: 1 };
+  var GAME_NAMES = { ttt: 'Morpion', rps: 'Pierre-feuille-ciseaux', wordle: 'Mot mystère', quiz: 'Quiz', series: 'Quiz Lost / The 100', color: 'Coloriage', memory: 'Memory' };
+  var GAME_TWO = { ttt: 1, rps: 1, memory: 1 };
+  var JOIN_NEXT = {};   // état après l'arrivée du 2e joueur
   var RPS_CH = ['Pierre', 'Feuille', 'Ciseaux'];
   var RPS_ICON = { Pierre: '✊', Feuille: '✋', Ciseaux: '✌️' };
   var TTT_LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 
   function gPlayerIndex(g, cid) { if (!g || !g.players) return -1; for (var i = 0; i < g.players.length; i++) if (g.players[i].cid === cid) return i; return -1; }
   function gName(g, i) { return g.players[i] ? g.players[i].name : '?'; }
+  // ---------- questions anglaises depuis Open Trivia Database (via le Worker) ----------
+  var TRIVIA_URL = 'https://trivia-db.toumiachraf9.workers.dev/';
+  var apiQ = [], apiLast = 0;
+  function trivDecode(t) { try { return decodeURIComponent(String(t)); } catch (e) { return String(t); } }
+  function loadApiQuiz() {
+    var now = Date.now(); if (now - apiLast < 6000) return; apiLast = now;   // l'API limite le nombre d'appels
+    fetch(TRIVIA_URL + '?amount=20').then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || j.response_code !== 0 || !Array.isArray(j.results)) return;
+      j.results.forEach(function (x) {
+        var choices = [trivDecode(x.correct_answer)].concat((x.incorrect_answers || []).map(trivDecode));
+        if (choices.length !== 4) return;
+        var order = gShuffle([0, 1, 2, 3]);
+        apiQ.push({ q: trivDecode(x.question), c: order.map(function (k) { return choices[k]; }), a: order.indexOf(0) });
+      });
+    }).catch(function () {});
+  }
   function gNew(type, cid, name, lang) {
     var bank = 'general';
     if (type === 'series') { type = 'quiz'; bank = 'series'; }
@@ -837,7 +854,9 @@
     if (type === 'rps') { g.score = [0, 0, 0]; g.picked = {}; g.result = null; }
     if (type === 'wordle') { g.rows = []; GAME_SECRET.word = pickWord(g.lang); }
     if (type === 'quiz') {
-      var set = pickQuiz(g.lang, 10, bank, []);            // 10 questions tirées au hasard, réponses mélangées
+      var useApi = (bank === 'general' && g.lang === 'en' && apiQ.length >= 10);
+      var set = useApi ? apiQ.splice(0, 10) : pickQuiz(g.lang, 10, bank, []);
+      g.src = useApi ? 'api' : 'local'; loadApiQuiz();            // 10 questions tirées au hasard, réponses mélangées
       g.bank = bank; g.usedQ = set.map(function (x) { return x.q; });
       GAME_SECRET.quiz = set.map(function (x) { return x.a; });
       g.qs = set.map(function (x) { return { q: x.q, c: x.c }; });
@@ -846,6 +865,12 @@
     if (type === 'color') {                                // image au hasard, zones à colorier
       var sub = pickColorSubject();
       g.subject = sub.id; g.regions = sub.parts.map(function () { return null; }); g.turn = 0;
+    }
+    if (type === 'memory') {
+      var deck = MEM_SYMBOLS.concat(MEM_SYMBOLS);
+      for (var di = deck.length - 1; di > 0; di--) { var dj = Math.floor(Math.random() * (di + 1)); var dt = deck[di]; deck[di] = deck[dj]; deck[dj] = dt; }
+      GAME_SECRET.deck = deck; g.faces = deck.map(function () { return null; }); g.done = deck.map(function () { return false; });
+      g.pend = []; g.turn = 0; g.pts = [0, 0];
     }
     return g;
   }
@@ -861,6 +886,7 @@
   }
   function gReveal(g) {
     var ans = GAME_SECRET.quiz[g.qi]; g.revealed = true; g.correct = ans; delete g.warn;
+    gAutoNext(g.id, g.qi);
     Object.keys(g.answers).forEach(function (k) { if (g.answers[k] === ans) g.scores[k] = (g.scores[k] || 0) + 1; });
   }
   // seul l'hôte exécute ceci : il valide le coup puis diffuse l'état
@@ -871,12 +897,29 @@
       if (GAME || !GAME_NAMES[act.type]) return;
       GAME = gNew(act.type, cid, name, act.lang); GAME.invite = { cid: cid, name: name }; return;
     }
+    if (a === 'closeall') {                                    // Fermer : tout le monde revient à la salle
+      GAME = null; GAME_SECRET = null; $('gbox').hidden = true; gmStop(); broadcast({ t: 'gclose' }); return;
+    }
     if (!GAME) return;
     var g = GAME, me = gPlayerIndex(g, cid);
     if (a === 'close') { GAME = null; GAME_SECRET = null; return; }
     if (a === 'join') {
       if (act.gid && act.gid !== g.id) return;
-      if (((GAME_TWO[g.type] && g.status === 'lobby') || (g.type === 'color' && g.status === 'play')) && me < 0) { g.players.push({ cid: cid, name: name }); g.status = 'play'; g.msg = ''; }
+      if (((GAME_TWO[g.type] && g.status === 'lobby') || (g.type === 'color' && g.status === 'play')) && me < 0) { g.players.push({ cid: cid, name: name }); g.status = JOIN_NEXT[g.type] || 'play'; g.msg = ''; }
+      return;
+    }
+    if (g.type === 'memory' && a === 'flip' && g.status === 'play' && me === g.turn) {   // Memory : deux cartes par tour
+      var mi = act.i | 0;
+      if (mi < 0 || mi >= g.faces.length || g.done[mi] || g.faces[mi] !== null) return;
+      if (g.pend.length === 2) { g.pend.forEach(function (j) { if (!g.done[j]) g.faces[j] = null; }); g.pend = []; }
+      g.faces[mi] = GAME_SECRET.deck[mi]; g.pend.push(mi);
+      if (g.pend.length === 2) {
+        var mA = g.pend[0], mB = g.pend[1];
+        if (GAME_SECRET.deck[mA] === GAME_SECRET.deck[mB]) {
+          g.done[mA] = true; g.done[mB] = true; g.pts[me] = (g.pts[me] || 0) + 1; g.pend = [];
+          if (g.done.every(function (x) { return x; })) g.status = 'over';
+        } else g.turn = 1 - g.turn;                             // pas de paire : le tour passe
+      }
       return;
     }
     if (g.type === 'ttt' && a === 'move' && g.status === 'play' && me === g.turn) {
@@ -1050,7 +1093,8 @@
   }
   // Jeux (bouton) : cache seulement la fenêtre, sans arrêter la partie
   function hideGames() { $('gbox').hidden = true; gmStop(); }
-  window.closeGamesFromFrame = closeGames;
+  function closeAllGames() { gAction({ a: 'closeall' }); $('gbox').hidden = true; gmStop(); }
+  window.closeGamesFromFrame = closeAllGames;
   window.gameAct = function (a) { gAction(a); };
   function acceptInvite() {
     var g = GAME; if (!g) return;
@@ -1062,6 +1106,58 @@
   $('btn-games').addEventListener('click', function () { if ($('gbox').hidden) openGames(); else hideGames(); });
   $('ginvite-yes').addEventListener('click', acceptInvite);
   $('ginvite-no').addEventListener('click', declineInvite);
+  // ---------- Stop / Clear du lecteur (hôte) ----------
+  function pStop() {
+    if (yt.active) { stopYT(false); return; }
+    if (embedSrc) { stopEmbed(false); return; }
+    if (hasVideo && !liveMode) { video.pause(); video.currentTime = 0; broadcast(stateMsg()); }
+  }
+  // Clear : retire tout ce qui est chargé et revient à l'écran de départ
+  function pClear(fromRemote) {
+    xferId++;
+    for (var pk in sendConn) { if (sendConn[pk]) { sendConn[pk].dead = true; try { sendConn[pk].close(); } catch (e) {} } }
+    sendConn = {};
+    stopYT(true); stopEmbed(true);
+    if (screenStream) stopScreen();
+    try { video.pause(); video.removeAttribute('src'); video.load(); } catch (e) {}
+    localFile = null; hasVideo = false; pendingState = null; liveMode = false;
+    layout.classList.remove('livemode');
+    $('fname').textContent = "Aucune vidéo pour l'instant";
+    $('drop').hidden = false; setDrop(DROP0.t, DROP0.x, true);
+    if (!fromRemote) broadcast({ t: 'clear' });
+  }
+  $('p-stop').addEventListener('click', pStop);
+  $('p-clear').addEventListener('click', function () { pClear(false); });
+  loadApiQuiz();
+  setInterval(function () { $('pctl').hidden = !(isHost && (hasVideo || yt.active || embedSrc)); }, 500);
+
+  // question suivante automatique : 2 secondes après l'affichage des résultats
+  function gAutoNext(id, qi) {
+    setTimeout(function () {
+      if (!isHost || !GAME || GAME.id !== id || GAME.qi !== qi || !GAME.revealed) return;
+      gApply({ a: 'nextq' }, gameId, myName); gBroadcast();
+    }, 2000);
+  }
+  // chat dans le jeu : même chat que la salle (même envoi, mêmes messages)
+  var gcOpen = false;
+  function gcRebuild() {
+    var gl = $('gchat-log'); gl.textContent = '';
+    Array.prototype.forEach.call($('msgs').children, function (c) { gl.appendChild(c.cloneNode(true)); });
+    gl.scrollTop = gl.scrollHeight;
+  }
+  $('g-chat-toggle').addEventListener('click', function () {
+    gcOpen = !gcOpen; $('gchat').hidden = !gcOpen;
+    $('g-chat-toggle').textContent = gcOpen ? GT(curLang, 'chat_close') : GT(curLang, 'chat_btn');
+    if (gcOpen) gcRebuild();
+  });
+  $('gchat-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var t = $('gchat-in').value.trim(); if (!t) return;
+    $('msg').value = t;
+    $('send').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    $('gchat-in').value = ''; $('msg').value = '';
+  });
+
   function toggleQueue() { $('qpanel').hidden = !$('qpanel').hidden; }
   // fin de la vidéo : l'hôte enchaîne avec la suivante
   video.addEventListener('ended', function () {
@@ -1146,6 +1242,7 @@
     }
     box.appendChild(el);
     box.scrollTop = box.scrollHeight;
+    if (gcOpen) { var gl = $('gchat-log'); gl.appendChild(el.cloneNode(true)); gl.scrollTop = gl.scrollHeight; }
   }
   // notifications : son + notification système + titre de l'onglet, seulement si la page n'est pas au premier plan
   var baseTitle = document.title, audioCtx = null, unread = 0;
@@ -1259,6 +1356,7 @@
   }, 3000);
   function setDrop(title, text, showPick, progress) {
     $('drop').hidden = false;
+    var srcg = document.querySelector('#drop .srcgrid'); if (srcg) srcg.hidden = !showPick;   // pendant un envoi : plus d'icônes
     $('drop-title').textContent = title;
     $('drop-text').textContent = text;
     $('btn-pick').hidden = !showPick;
@@ -1404,6 +1502,7 @@
           var wasGame = GAME; GAME = d.g || null; if (GAME && !wasGame) showToast('Jeux', GT(curLang, 'started')); renderGame();
         }
         break;
+      case 'gclose': $('gbox').hidden = true; gmStop(); break;
       case 'gact':
         if (isHost) { gApply(d.act, String(d.cid || '').slice(0, 40), String(d.name || '').slice(0, 20)); gBroadcast(); }
         break;
@@ -1488,6 +1587,7 @@
       case 'spotstop': if (!isHost && spot.active) stopSpot(false); break;
       case 'yths': onYtHeartbeat(d); break;
       case 'theme': case 'wpneed': case 'wpchunk': if (window.__theme) window.__theme.receive(d, c.peerName); break;
+      case 'clear': pClear(true); break;
       case 'ytstop': if (yt.active) { stopYT(true); addMsg('', (d.name || 'Ton ami') + ' a arrêté la vidéo YouTube.', 'sys'); } break;
     }
   }

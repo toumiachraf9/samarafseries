@@ -629,6 +629,26 @@
   .gbox .palette { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 6px 0 10px; }
   .gbox .swatch { width: 46px; height: 46px; border-radius: 50%; border: 3px solid var(--line); cursor: pointer; padding: 0; box-shadow: 0 4px 0 rgba(0, 0, 0, .35); }
   .gbox .swatch.on { border-color: #ffffff; box-shadow: 0 0 0 3px var(--accent), 0 4px 0 rgba(0, 0, 0, .35); transform: translateY(-2px); }
+  .gbox .charsgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: min(92vw, 440px); }
+  .gbox .chbtn { padding: 10px 6px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-2); color: var(--fg); font-weight: 700; cursor: pointer; }
+  .gbox .qitem { width: min(92vw, 440px); background: var(--panel-2); border-radius: 12px; padding: 10px 12px; text-align: start; }
+  .gbox .qans { color: var(--accent); font-weight: 800; margin-top: 4px; }
+  .gbox .hangrow { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+  .gbox .lbox { display: inline-flex; width: 30px; height: 40px; align-items: center; justify-content: center; border-bottom: 3px solid var(--accent); font-size: 22px; font-weight: 800; }
+  .gbox .lbox.sp { border-bottom: none; width: 12px; }
+  .gbox .dsvg { width: min(90vw, 340px); height: auto; background: #ffffff; border-radius: 14px; touch-action: none; display: block; }
+  .gbox .mgrid { display: grid; grid-template-columns: repeat(4, 72px); gap: 8px; }
+  .gbox .mcard2 { width: 72px; height: 72px; border-radius: 14px; border: none; font-size: 30px; background: var(--panel-2); color: var(--fg); box-shadow: 0 4px 0 rgba(0, 0, 0, .35); cursor: pointer; }
+  .gbox .mcard2.open { background: var(--accent); }
+  .gbox .mcard2.done { background: var(--panel); opacity: .6; }
+  .gbox .mcard2:disabled { cursor: default; }
+  .pctl { position: absolute; top: 10px; right: 10px; z-index: 8; display: flex; gap: 6px; }
+  .pctl[hidden] { display: none; }
+  .gchatbar { display: flex; justify-content: center; padding: 8px 16px 16px; }
+  .gchat { max-width: 560px; width: min(94vw, 560px); margin: 0 auto 24px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 14px; padding: 10px; }
+  .gchat-log { height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 4px; }
+  .gchat-form { display: flex; gap: 8px; margin-top: 8px; }
+  .gchat-form input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); }
   .btn.right { border-color: #2e9e4f; }
   .btn.wrong { border-color: #c44; }
   .rbar { display: flex; gap: 4px; margin-top: 4px; }
@@ -878,6 +898,7 @@
         <video id="video" playsinline controls></video>
 
         <div id="yt" hidden></div>
+        <div class="pctl" id="pctl" hidden><button class="btn small" id="p-stop" type="button">■ Stop</button><button class="btn small" id="p-clear" type="button">✕ Clear</button></div>
 
         <div class="drop" id="drop">
           <div class="drop-inner">
@@ -902,7 +923,9 @@
           <p class="error" id="q-link-err" role="alert"></p>
           <ul class="qlist" id="qlist"></ul>
         </div>
-        <div class="gbox" id="gbox" hidden><header class="ghead"><b id="gtitle">Jeux</b><button class="btn small" id="g-music" type="button" title="Musique">🔊</button><button class="btn small" id="g-close" type="button">Fermer</button></header><main id="gbody"></main></div>
+        <div class="gbox" id="gbox" hidden><header class="ghead"><b id="gtitle">Jeux</b><button class="btn small" id="g-music" type="button" title="Musique">🔊</button><button class="btn small" id="g-close" type="button">Fermer</button></header><main id="gbody"></main>
+          <div class="gchatbar"><button class="btn small" id="g-chat-toggle" type="button">💬 Chat</button></div>
+          <div class="gchat" id="gchat" hidden><div class="gchat-log" id="gchat-log"></div><form class="gchat-form" id="gchat-form"><input id="gchat-in" type="text" maxlength="500" autocomplete="off" placeholder="Message…"><button class="btn small primary" type="submit">OK</button></form></div></div>
                         <div class="ginvite" id="ginvite" hidden><div class="gi-card"><div class="gi-icon">🎲</div><p class="gi-text" id="ginvite-text"></p><div class="gi-btns"><button class="btn primary" id="ginvite-yes" type="button">Accepter</button><button class="btn" id="ginvite-no" type="button">Refuser</button></div></div></div>
         <div class="tap" id="tap" hidden>
           <button class="btn primary" id="btn-tap" type="button" data-i18n="r_tap">Appuie pour lancer la lecture</button>
@@ -1093,11 +1116,12 @@
 <script src="js/app-1.js"></script>
 
 <script src="js/app-2.js"></script>
-<script src="js/games-content.js?v=29"></script>
+<script src="js/games-content.js?v=33"></script>
 <script src="js/games-q-general.js?v=1"></script>
 <script src="js/games-q-series.js?v=2"></script>
-<script src="js/games.js?v=31"></script>
-<script src="js/app-3.js?v=29"></script>
+<script src="js/games-q-artrivia.js?v=1"></script>
+<script src="js/games.js?v=36"></script>
+<script src="js/app-3.js?v=33"></script>
 <script type="module" src="js/app-4-module.js"></script>
 </body>
 </html>

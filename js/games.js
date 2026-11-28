@@ -3,13 +3,13 @@ function $(id) { return document.getElementById(id); }
 var STATE = { g: null, me: '', host: false, ui: 'fr' };
 var GAME_ACT = function () {};
 var PICK = null;                                   // jeu dont on choisit la langue
-var GAME_TWO = { ttt: 1, rps: 1 };
+var GAME_TWO = { ttt: 1, rps: 1, memory: 1 };
 var RPS_CH = ['Pierre', 'Feuille', 'Ciseaux'];
 var RPS_KIND = { Pierre: 'rock', Feuille: 'paper', Ciseaux: 'scissors' };
 var LANG_LABEL = { fr: 'Français', en: 'English', ar: 'العربية' };
 var HS = '#f5a07f', HL = '#d9826a', HY = '#e8a722';
 var NEEDS_LANG = { quiz: 1, series: 1 };
-var GAME_KEYS = ['ttt', 'rps', 'series', 'color', 'quiz'];
+var GAME_KEYS = ['ttt', 'rps', 'series', 'color', 'quiz', 'memory'];
 
 function gEl(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function T(key, vars) { return GT(STATE.ui, key, vars); }
@@ -75,6 +75,11 @@ function act(a) {
 // ---------- textes d'état ----------
 function gStatus(g, mine) {
   if (g.status === 'lobby') return T('lobby');
+  if (g.type === 'memory') {
+    if (g.status === 'over') return T('g_mem_done');
+    var mp = g.players[g.turn];
+    return T('g_mem_turn', { n: mp ? mp.name : '?' });
+  }
   if (g.type === 'ttt') {
     if (g.status === 'over') return g.winner < 0 ? T('draw') : T('win_named', { n: gName(g, g.winner) });
     return T('turn', { n: gName(g, g.turn) }) + (g.turn === mine ? ' ' + T('you') : '');
@@ -227,6 +232,8 @@ function drawQuiz(body, g, mine) {
     }
     return;
   }
+  if (g.src === 'api') body.appendChild(gEl('p', 'gscore', T('quiz_src')));
+  if (g.lang === 'ar' && g.bank === 'general') body.appendChild(gEl('p', 'gscore', T('quiz_src_ar')));
   var Q = g.qs[g.qi], mineA = quizMine(g);
   var qkey = g.id + ':' + g.qi, newQ = FX.q !== qkey; FX.q = qkey;
   var rkey = g.revealed ? qkey : '', newR = !!rkey && FX.r !== rkey; if (rkey) FX.r = rkey;
@@ -306,11 +313,7 @@ function drawQuiz(body, g, mine) {
   body.appendChild(card);
 
   var qrow = gEl('div', 'grow');
-  if (g.revealed) {                                   // pas de bouton « Révéler » : les réponses s'affichent quand tout le monde a répondu
-
-    var nb = gBtn(g.qi + 1 < g.qs.length ? T('next_q') : T('see_result'), function () { act({ a: 'nextq' }); });
-    nb.classList.add('primary', 'qnext'); qrow.appendChild(nb);
-  }
+  // plus de bouton « Question suivante » : la question suivante arrive 2 secondes après les résultats
   body.appendChild(qrow);
   drawBoard(body, g, newR ? gained : null);
 }
@@ -377,6 +380,22 @@ function saveColorImage(g, sub) {
 }
 
 // ---------- choix de la langue (quiz et Lost / The 100) ----------
+// ---------- Devine le personnage, Pendu, Dessin et devinette, Memory ----------
+function drawMemory(body, g, mine) {
+  var grid = gEl('div', 'mgrid');
+  var n = g.faces.length;
+  for (var i = 0; i < n; i++) (function (idx) {
+    var face = g.faces[idx];
+    var b = gEl('button', 'mcard2' + (g.done[idx] ? ' done' : (face ? ' open' : '')), face || '?'); b.type = 'button';
+    b.disabled = !(g.status === 'play' && mine === g.turn && face === null && !g.done[idx]);
+    b.addEventListener('click', function () { act({ a: 'flip', i: idx }); });
+    grid.appendChild(b);
+  })(i);
+  body.appendChild(grid);
+  var p0 = g.players[0] ? g.players[0].name : '—', p1 = g.players[1] ? g.players[1].name : '—';
+  body.appendChild(gEl('p', 'gscore', T('g_scores') + p0 + ' ' + g.pts[0] + ' · ' + p1 + ' ' + g.pts[1]));
+}
+
 function drawPicker(body) {
   body.appendChild(gEl('p', 'gmsg', T('pick_lang')));
   var row = gEl('div', 'menu');
@@ -423,10 +442,11 @@ function renderGame() {
   if (g.type === 'wordle') drawWordle(body, g);
   if (g.type === 'quiz') drawQuiz(body, g, mine);
   if (g.type === 'color') drawColor(body, g, mine);
+  if (g.type === 'memory') drawMemory(body, g, mine);
   if (g.msg) body.appendChild(gEl('p', 'gmsg', g.msg));
   var row = gEl('div', 'grow');
   if (((GAME_TWO[g.type] && g.status === 'lobby') || (g.type === 'color' && g.status === 'play')) && mine < 0) row.appendChild(gBtn(g.type === 'color' ? T('color_join') : T('join'), function () { act({ a: 'join' }); }));
-  if (mine >= 0 || STATE.host || g.status === 'over') row.appendChild(gBtn(g.status === 'over' ? T('back') : T('stop'), function () { act({ a: 'close' }); }));
+  if (mine >= 0 || STATE.host || g.status === 'over') row.appendChild(gBtn(T('stop'), function () { act({ a: 'close' }); }));
   body.appendChild(row);
 }
 

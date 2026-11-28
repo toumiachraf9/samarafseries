@@ -349,3 +349,45 @@ Object.keys({fr:1,en:1,ar:1}).forEach(function (l) {
     waiting: { fr: 'En attente des autres joueurs…', en: 'Waiting for the other players…', ar: 'في انتظار اللاعبين الآخرين…' }[l]
   });
 });
+
+// ---------- Devine le personnage, Pendu, Dessin, Memory
+var GUESS_CHARS = ['Jack','Kate','Sawyer','Locke','Hurley','Sayid','Ben','Juliet','Jin','Sun','Charlie','Desmond','Clarke','Bellamy','Octavia','Raven','Finn','Lexa','Murphy','Monty','Harper','Jasper','Abby','Jaha','Kane','Lincoln'];
+var MEM_SYMBOLS = ['🌊','✈️','🔥','🧭','🐻','📻','🌳','🗝️'];
+function gDrawKey(v) { return String(v || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' '); }
+var GT_GAMES = {
+  fr: { name_guess: 'Devine le personnage', desc_guess: 'Pose des questions oui / non', name_hang: 'Pendu', desc_hang: 'Trouve le mot lettre par lettre',
+        name_draw: 'Dessin et devinette', desc_draw: 'Dessine, les autres devinent', name_memory: 'Memory', desc_memory: 'Retrouve les paires',
+        g_pick: 'Choisis le personnage secret', g_wait_pick: '{n} choisit le personnage secret…', g_ask_ph: 'Pose une question oui / non', g_ask: 'Demander',
+        g_yes: 'Oui', g_no: 'Non', g_maybe: 'Parfois', g_guess_ph: 'Ton hypothèse', g_guess: 'Deviner', g_qleft: '{n} questions restantes',
+        g_win_guess: '{n} a trouvé !', g_win_thinker: "{n} gagne : personne n'a trouvé", g_guessed: 'Trouvé',
+        g_hang_word: 'Choisis un mot secret', g_wait_word: 'En attente du mot de {n}…', g_word_ph: 'Mot secret', g_send: 'Valider',
+        g_letter_ph: 'Une lettre', g_try: 'Essayer', g_miss: 'Erreurs : {m} / 6', g_hang_win: 'Bravo, mot trouvé !', g_hang_lose: 'Perdu. Le mot était : {w}',
+        g_draw_word: 'Choisis le mot à dessiner', g_draw_wait: '{n} choisit le mot à dessiner…', g_draw_turn: '{n} dessine', g_draw_ph: 'Ta réponse',
+        g_clear: 'Effacer', g_round_over: '{n} a trouvé ! Le mot était : {w}', g_next_round: 'Manche suivante',
+        g_mem_turn: 'Au tour de {n}', g_mem_done: 'Partie terminée !', g_scores: 'Scores : ' },
+  en: { name_guess: 'Guess the character', desc_guess: 'Ask yes / no questions', name_hang: 'Hangman', desc_hang: 'Find the word letter by letter',
+        name_draw: 'Draw and guess', desc_draw: 'Draw, the others guess', name_memory: 'Memory', desc_memory: 'Find the pairs',
+        g_pick: 'Pick the secret character', g_wait_pick: '{n} is picking the secret character…', g_ask_ph: 'Ask a yes / no question', g_ask: 'Ask',
+        g_yes: 'Yes', g_no: 'No', g_maybe: 'Sometimes', g_guess_ph: 'Your guess', g_guess: 'Guess', g_qleft: '{n} questions left',
+        g_win_guess: '{n} found it!', g_win_thinker: '{n} wins: nobody found it', g_guessed: 'Found',
+        g_hang_word: 'Pick a secret word', g_wait_word: 'Waiting for the word from {n}…', g_word_ph: 'Secret word', g_send: 'Send',
+        g_letter_ph: 'One letter', g_try: 'Try', g_miss: 'Mistakes: {m} / 6', g_hang_win: 'Well done, word found!', g_hang_lose: 'Lost. The word was: {w}',
+        g_draw_word: 'Pick the word to draw', g_draw_wait: '{n} is picking the word to draw…', g_draw_turn: '{n} is drawing', g_draw_ph: 'Your answer',
+        g_clear: 'Clear', g_round_over: '{n} found it! The word was: {w}', g_next_round: 'Next round',
+        g_mem_turn: "{n}'s turn", g_mem_done: 'Game finished!', g_scores: 'Scores: ' },
+  ar: { name_guess: 'خمّن الشخصية', desc_guess: 'اطرح أسئلة نعم / لا', name_hang: 'المشنقة', desc_hang: 'اكشف الكلمة حرفاً حرفاً',
+        name_draw: 'ارسم وخمّن', desc_draw: 'ارسم والآخرون يخمّنون', name_memory: 'الذاكرة', desc_memory: 'اعثر على الأزواج',
+        g_pick: 'اختر الشخصية السرية', g_wait_pick: '{n} يختار الشخصية السرية…', g_ask_ph: 'اطرح سؤال نعم / لا', g_ask: 'اسأل',
+        g_yes: 'نعم', g_no: 'لا', g_maybe: 'أحياناً', g_guess_ph: 'تخمينك', g_guess: 'خمّن', g_qleft: 'متبقي {n} سؤالاً',
+        g_win_guess: 'وجدها {n}!', g_win_thinker: 'يفوز {n}: لم يجدها أحد', g_guessed: 'وجدها',
+        g_hang_word: 'اختر كلمة سرية', g_wait_word: 'في انتظار كلمة {n}…', g_word_ph: 'الكلمة السرية', g_send: 'إرسال',
+        g_letter_ph: 'حرف واحد', g_try: 'جرّب', g_miss: 'الأخطاء: {m} / 6', g_hang_win: 'أحسنت، وجدتم الكلمة!', g_hang_lose: 'خسرتم. الكلمة كانت: {w}',
+        g_draw_word: 'اختر الكلمة التي سترسمها', g_draw_wait: '{n} يختار الكلمة التي سيرسمها…', g_draw_turn: '{n} يرسم', g_draw_ph: 'إجابتك',
+        g_clear: 'مسح', g_round_over: 'وجدها {n}! الكلمة كانت: {w}', g_next_round: 'الجولة التالية',
+        g_mem_turn: 'دور {n}', g_mem_done: 'انتهت اللعبة!', g_scores: 'النقاط: ' }
+};
+Object.keys(GT_GAMES).forEach(function (l) { Object.assign(GAME_T[l], GT_GAMES[l]); });
+GAME_T.fr.stop = 'Retour au menu'; GAME_T.en.stop = 'Back to menu'; GAME_T.ar.stop = 'العودة إلى القائمة';
+GAME_T.fr.quiz_src = 'Source : Open Trivia Database (CC BY-SA 4.0)'; GAME_T.en.quiz_src = 'Source: Open Trivia Database (CC BY-SA 4.0)'; GAME_T.ar.quiz_src = 'المصدر: Open Trivia Database (CC BY-SA 4.0)';
+GAME_T.fr.quiz_src_ar = 'Certaines questions : ArTrivia (salrowili), d’après Wikipédia arabe'; GAME_T.en.quiz_src_ar = 'Some questions: ArTrivia (salrowili), from Arabic Wikipedia'; GAME_T.ar.quiz_src_ar = 'بعض الأسئلة: ArTrivia (salrowili)، من ويكيبيديا العربية';
+GAME_T.fr.chat_btn = '💬 Chat'; GAME_T.fr.chat_close = '✕ Fermer le chat'; GAME_T.en.chat_btn = '💬 Chat'; GAME_T.en.chat_close = '✕ Close chat'; GAME_T.ar.chat_btn = '💬 الدردشة'; GAME_T.ar.chat_close = '✕ إغلاق الدردشة';
