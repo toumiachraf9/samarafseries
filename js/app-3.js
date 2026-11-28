@@ -3059,7 +3059,7 @@
   /* ---------- interface ---------- */
   $('btn-create').addEventListener('click', function () {
     var n = readName(); if (!n) return;
-    myName = n; createRoom();
+    myName = n; if (window.bdayStart) bdayStart(n); createRoom();
   });
   $('btn-join').addEventListener('click', function () {
     var n = readName(); if (!n) return;
@@ -3068,7 +3068,7 @@
     var code = cleanCode($('code').value);
     if (code.length !== 6) { $('home-error').textContent = "Entre le code d'accès à 6 caractères."; $('code').focus(); return; }
     $('room-id').value = fmtId(id); $('code').value = code;
-    myName = n; joinRoom(id, code);
+    myName = n; if (window.bdayStart) bdayStart(n); joinRoom(id, code);
   });
   $('invite-own').addEventListener('click', exitInviteMode);
   try { $('fixed-code').checked = localStorage.getItem('a2g-fixed') === '1'; } catch (e) {}
